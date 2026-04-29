@@ -1,13 +1,15 @@
 """
 FastAPI backend — Forecasting Agent
-Session 1: health check + ingest endpoint
-Sessions 2-4 will add agent endpoints and SSE streaming
+Sessions 1+2: health, ingest, retrieve, run-cycle endpoints
 """
 
+import json
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
-app = FastAPI(title="Forecasting Agent API", version="0.1.0")
+app = FastAPI(title="Forecasting Agent API", version="0.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,12 +21,11 @@ app.add_middleware(
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "0.1.0"}
+    return {"status": "ok", "version": "0.2.0"}
 
 
 @app.post("/api/ingest")
 def ingest():
-    """Trigger knowledge base ingestion. Run once to seed Qdrant."""
     try:
         from knowledge.ingest import main as run_ingest
         run_ingest()
@@ -36,7 +37,6 @@ def ingest():
 @app.post("/api/retrieve")
 def retrieve(payload: dict):
     """
-    Test retrieval endpoint.
     Body: { "query": "...", "client_id": "HERSHEYS", "user_role": "DS" }
     """
     try:
@@ -49,3 +49,33 @@ def retrieve(payload: dict):
         return result
     except Exception as e:
         return {"status": "error", "detail": str(e)}
+
+
+@app.post("/api/run-cycle")
+def run_cycle(payload: dict):
+    """
+    Run full agent chain for a scenario.
+    Body: { "scenario_id": "hersheys_cycle_47", "user_role": "DS" }
+    Returns complete results (non-streaming).
+    """
+    try:
+        from agents.orchestrator import run_full_cycle, DEMO_SCENARIOS
+        scenario_id = payload.get("scenario_id", "hersheys_cycle_47")
+        user_role   = payload.get("user_role", "DS")
+        scenario    = DEMO_SCENARIOS.get(scenario_id)
+        if not scenario:
+            return {"status": "error",
+                    "detail": f"Unknown scenario: {scenario_id}. "
+                              f"Available: {list(DEMO_SCENARIOS.keys())}"}
+        results = run_full_cycle(scenario, user_role=user_role)
+        return {"status": "complete", "results": results}
+    except Exception as e:
+        import traceback
+        return {"status": "error", "detail": str(e),
+                "trace": traceback.format_exc()}
+
+
+@app.get("/api/scenarios")
+def list_scenarios():
+    from agents.orchestrator import DEMO_SCENARIOS
+    return {"scenarios": list(DEMO_SCENARIOS.keys())}
