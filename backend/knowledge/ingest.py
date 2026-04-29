@@ -70,7 +70,19 @@ def setup_collection(client: QdrantClient):
         collection_name=COLLECTION_NAME,
         vectors_config=VectorParams(size=VECTOR_DIM, distance=Distance.COSINE),
     )
-    print(f"Collection '{COLLECTION_NAME}' created.")
+    # Create payload indexes for filtered search
+    from qdrant_client.models import PayloadSchemaType
+    client.create_payload_index(
+        collection_name=COLLECTION_NAME,
+        field_name="client_id",
+        field_schema=PayloadSchemaType.KEYWORD,
+    )
+    client.create_payload_index(
+        collection_name=COLLECTION_NAME,
+        field_name="source_type",
+        field_schema=PayloadSchemaType.KEYWORD,
+    )
+    print(f"Collection '{COLLECTION_NAME}' created with payload indexes.")
 
 
 def ingest(docs: list[dict], client: QdrantClient, model: SentenceTransformer):

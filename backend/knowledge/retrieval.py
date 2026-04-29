@@ -1,6 +1,6 @@
 """
 RAG Knowledge Agent — retrieval pipeline.
-Implements: NL query router → pre-filter → semantic search → re-rank.
+Implements: NL query router -> pre-filter -> semantic search -> re-rank.
 
 Three Rippling-aligned design decisions:
 1. Metadata catalog: every chunk tagged with source_type, client, role, segment
@@ -19,13 +19,7 @@ from sentence_transformers import SentenceTransformer
 load_dotenv()
 
 COLLECTION_NAME = "forecasting_knowledge"
-EMBEDDING_MODEL  = "all-MiniLM-L6-v2"
-
-# ── NL Query Router ──────────────────────────────────────────────────────────
-# Intent classification rules: map query signals to source_type pre-selection.
-# PM decision: without this, "why is pipeline underperforming" retrieves
-# trade_calendar chunks because "underperform" appears in promo records.
-# Routing by intent dramatically improves precision before any vector math.
+EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 INTENT_ROUTING = {
     "data_issue": {
@@ -74,56 +68,34 @@ DEFAULT_SOURCE_TYPES = [
 
 
 def classify_intent(query: str) -> tuple[str, list[str]]:
-    """
-    Route query to relevant source_types before vector search.
-    Returns (intent_label, [source_types]).
-    This is the NL query router — answers Rippling's question:
-    'how does the backend know which dataset to call?'
-    """
     q = query.lower()
     best_intent = "general"
-    best_types  = DEFAULT_SOURCE_TYPES
-    best_score  = 0
+    best_types = DEFAULT_SOURCE_TYPES
+    best_score = 0
 
     for intent, config in INTENT_ROUTING.items():
         score = sum(1 for s in config["signals"] if s in q)
         if score > best_score:
-            best_score  = score
+            best_score = score
             best_intent = intent
-            best_types  = config["source_types"]
+            best_types = config["source_types"]
 
     return best_intent, best_types
 
 
 def get_rag_context(
-    query:     str,
+    query: str,
     client_id: str,
     user_role: str = "DS",
-    top_k:     int = 5,
+    top_k: int = 5,
 ) -> dict:
-    """
-    Three-stage retrieval: pre-filter → semantic search → re-rank.
-
-    Stage 1 — Pre-filter (metadata catalog):
-      Narrows search space using client_id + permission graph (user_role)
-      + NL query router (source_types). Zero vector computation at this stage.
-      Rippling parallel: scoping retrieval by company_id + role before
-      any AI processing — same query, different results per role.
-
-    Stage 2 — Semantic search:
-      Vector similarity within filtered subset. Returns top_k * 3 candidates.
-
-    Stage 3 — Re-rank:
-      Lightweight keyword overlap re-rank. In production this would be a
-      cross-encoder model. Returns final top_k.
-    """
     qdrant = QdrantClient(
         url=os.getenv("QDRANT_URL"),
         api_key=os.getenv("QDRANT_API_KEY"),
     )
     model = SentenceTransformer(EMBEDDING_MODEL)
 
-    # ── Stage 1: NL query router + metadata pre-filter ──────────────────────
+    # Stage 1: NL query router + metadata pre-filter
     intent, source_types = classify_intent(query)
 
     must_conditions = [
@@ -135,28 +107,27 @@ def get_rag_context(
     ]
     search_filter = Filter(must=must_conditions)
 
-    # ── Stage 2: Semantic vector search ─────────────────────────────────────
+    # Stage 2: Semantic vector search
     query_vector = model.encode(query).tolist()
-    candidates = qdrant.search(
+    search_result = qdrant.query_points(
         collection_name=COLLECTION_NAME,
-        query_vector=query_vector,
+        query=query_vector,
         query_filter=search_filter,
         limit=top_k * 3,
         with_payload=True,
     )
+    candidates = search_result.points
 
-    # ── Permission graph: filter by user_role ───────────────────────────────
-    # visible_to is stored as JSON string e.g. '["DS", "planner"]'
-    # This enforces role-based access at retrieval time — a planner cannot
-    # retrieve DS-only chunks like model eval internals.
+    # Permission graph: filter by user_role
     permitted = []
     for hit in candidates:
         visible = json.loads(hit.payload.get("visible_to", '["DS"]'))
         if user_role in visible:
             permitted.append(hit)
 
-    # ── Stage 3: Re-rank by keyword overlap ─────────────────────────────────
+    # Stage 3: Re-rank by keyword overlap
     query_tokens = set(query.lower().split())
+
     def overlap_score(hit):
         content_tokens = set(hit.payload.get("content", "").lower().split())
         return len(query_tokens & content_tokens)
@@ -167,35 +138,34 @@ def get_rag_context(
         reverse=True,
     )[:top_k]
 
-    # ── Format results ───────────────────────────────────────────────────────
+    # Format results
     results = []
     for hit in reranked:
         p = hit.payload
         results.append({
-            "doc_id":           p.get("doc_id"),
-            "source_type":      p.get("source_type"),
-            "date":             p.get("date"),
-            "relevance_score":  round(hit.score, 3),
-            "content":          p.get("content"),
-            "segment":          p.get("segment"),
+            "doc_id": p.get("doc_id"),
+            "source_type": p.get("source_type"),
+            "date": p.get("date"),
+            "relevance_score": round(hit.score, 3),
+            "content": p.get("content"),
+            "segment": p.get("segment"),
             "root_cause_layer": p.get("root_cause_layer"),
         })
 
     gaps = "No relevant context found." if not results else None
 
     return {
-        "query":              query,
-        "intent":             intent,
+        "query": query,
+        "intent": intent,
         "source_types_searched": source_types,
-        "user_role":          user_role,
-        "results":            results,
+        "user_role": user_role,
+        "results": results,
         "retrieval_confidence": round(reranked[0].score, 3) if reranked else 0.0,
-        "gaps":               gaps,
+        "gaps": gaps,
     }
 
 
 if __name__ == "__main__":
-    # Quick smoke test
     result = get_rag_context(
         query="Kroger feed failure chocolate seasonal",
         client_id="HERSHEYS",

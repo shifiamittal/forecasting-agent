@@ -36,7 +36,7 @@ def run_full_cycle(scenario: dict, user_role: str = "DS") -> dict:
     priority_segs   = routing.get("priority_segments", [])
 
     # Step 2: Exception Triage (always runs if activated)
-    if "exception_triage_agent" in agents_activated:
+    if any("exception_triage" in a.lower() for a in agents_activated):
         print("Running Exception Triage...")
         triage = run_exception_triage(
             cycle_id=routing["cycle_id"],
@@ -48,7 +48,7 @@ def run_full_cycle(scenario: dict, user_role: str = "DS") -> dict:
         results["exception_triage"] = triage
 
     # Step 3: RCA Diagnostic
-    if "rca_diagnostic_agent" in agents_activated:
+    if any("rca_diagnostic" in a.lower() for a in agents_activated):
         print("Running RCA Diagnostic...")
         rca = run_rca_diagnostic(
             cycle_id=routing["cycle_id"],
