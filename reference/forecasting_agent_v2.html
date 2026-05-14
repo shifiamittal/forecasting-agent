@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Keystone.ai — Forecasting Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --ink-900:#0d1117;
+  --ink-800:#1c2333;
+  --ink-700:#2d3748;
+  --ink-600:#4a5568;
+  --ink-400:#718096;
+  --ink-300:#a0aec0;
+  --ink-200:#cbd5e0;
+  --ink-100:#e2e8f0;
+  --ink-50:#f7fafc;
+
+  --white:#ffffff;
+  --surface:#ffffff;
+  --surface-2:#f8fafd;
+  --surface-3:#f0f4f8;
+
+  --text-1:#0d1117;
+  --text-2:#4a5568;
+  --text-3:#718096;
+  --text-4:#a0aec0;
+
+  --border-soft:rgba(13,17,23,0.07);
+  --border-med:rgba(13,17,23,0.12);
+  --border-strong:rgba(13,17,23,0.18);
+
+  --red-bg:#fef2f2;--red-border:#fecaca;--red-text:#991b1b;--red-mid:#dc2626;
+  --amber-bg:#fffbeb;--amber-border:#fde68a;--amber-text:#92400e;--amber-mid:#d97706;
+  --green-bg:#f0fdf4;--green-border:#bbf7d0;--green-text:#14532d;--green-mid:#16a34a;
+  --blue-bg:#eff6ff;--blue-border:#bfdbfe;--blue-text:#1e40af;--blue-mid:#2563eb;
+  --teal-bg:#f0fdfa;--teal-border:#99f6e4;--teal-text:#134e4a;--teal-mid:#0d9488;
+  --violet-bg:#f5f3ff;--violet-border:#ddd6fe;--violet-text:#4c1d95;--violet-mid:#7c3aed;
+
+  --r-sm:6px;--r-md:10px;--r-lg:14px;--r-xl:18px;
+  --font:'IBM Plex Sans',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+  --sidebar-w:220px;
+  --topbar-h:52px;
+}
+
+html,body{height:100%;font-family:var(--font);font-size:14px;line-height:1.6;color:var(--text-1);background:var(--surface-2);-webkit-font-smoothing:antialiased}
+
+/* ── layout ── */
+.shell{display:grid;grid-template-columns:var(--sidebar-w) 1fr;grid-template-rows:var(--topbar-h) 1fr;height:100vh;overflow:hidden}
+
+/* ── sidebar ── */
+.sidebar{grid-row:1/-1;background:var(--ink-900);color:#e2e8f0;display:flex;flex-direction:column;overflow-y:auto;border-right:1px solid rgba(255,255,255,0.05)}
+.sb-top{padding:18px 16px 14px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.sb-brand{font-size:14px;font-weight:600;color:#f0f4f8;letter-spacing:-0.02em}
+.sb-brand span{color:#60a5fa}
+.sb-sub{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-300);margin-top:2px}
+.sb-section{padding:14px 12px 6px}
+.sb-label{font-size:9.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-400);margin-bottom:8px;padding:0 4px}
+
+.cycle-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:var(--r-md);padding:11px 12px;margin:0 12px}
+.cc-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11.5px}
+.cc-k{color:var(--ink-300)}
+.cc-v{color:#e2e8f0;font-weight:500}
+.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#4ade80;margin-right:4px;vertical-align:middle}
+
+.run-btn{margin:10px 12px 0;width:calc(100% - 24px);background:#2563eb;color:#fff;border:none;font-family:var(--font);font-size:12.5px;font-weight:500;padding:9px 14px;border-radius:var(--r-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .15s}
+.run-btn:hover{background:#1d4ed8}
+.run-btn.running{background:var(--ink-700);cursor:not-allowed;pointer-events:none}
+.spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
+.running .spin{display:block}
+.run-label-idle{display:block}.running .run-label-idle{display:none}
+.run-label-busy{display:none}.running .run-label-busy{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.sb-footer{margin-top:auto;padding:12px 16px;border-top:1px solid rgba(255,255,255,.06);font-size:10.5px;color:var(--ink-400)}
+
+/* ── topbar ── */
+.topbar{background:var(--surface);border-bottom:1px solid var(--border-soft);display:flex;align-items:center;padding:0 20px;gap:2px}
+.tab{height:100%;padding:0 14px;background:transparent;border:none;font-family:var(--font);font-size:12.5px;color:var(--text-3);cursor:pointer;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;margin-bottom:-1px;transition:color .15s,border-color .15s;white-space:nowrap}
+.tab:hover{color:var(--text-2)}
+.tab.active{color:var(--text-1);font-weight:500;border-bottom-color:#2563eb}
+.tab-num{font-size:10px;font-weight:700;background:var(--red-bg);color:var(--red-mid);padding:1px 6px;border-radius:9px}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12px}
+.cycle-pill{background:var(--surface-3);border:1px solid var(--border-soft);border-radius:20px;padding:3px 10px;color:var(--text-2);font-weight:500}
+.role-pill{border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600}
+.rp-planner{background:var(--blue-bg);color:var(--blue-text)}
+.rp-ds{background:var(--violet-bg);color:var(--violet-text)}
+.selected-exc-pill{background:var(--amber-bg);border:1px solid var(--amber-border);color:var(--amber-text);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:500;display:none}
+
+/* ── main ── */
+.main{overflow-y:auto;background:var(--surface-2)}
+.panel{display:none;padding:18px 20px;animation:fadein .2s ease}
+.panel.active{display:block}
+@keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ── shared card ── */
+.card{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--r-lg);overflow:hidden;margin-bottom:14px}
+.card-head{padding:12px 16px;border-bottom:1px solid var(--border-soft);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:13px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:7px}
+.card-icon{width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
+.ci-red{background:var(--red-bg);color:var(--red-mid)}
+.ci-amber{background:var(--amber-bg);color:var(--amber-mid)}
+.ci-blue{background:var(--blue-bg);color:var(--blue-mid)}
+.ci-green{background:var(--green-bg);color:var(--green-mid)}
+.ci-teal{background:var(--teal-bg);color:var(--teal-mid)}
+.ci-violet{background:var(--violet-bg);color:var(--violet-mid)}
+.card-body{padding:14px 16px}
+
+/* ── pill / badge ── */
+.pill{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:2px 8px;border-radius:9px;white-space:nowrap}
+.p-red{background:var(--red-bg);color:var(--red-text)}
+.p-amber{background:var(--amber-bg);color:var(--amber-text)}
+.p-green{background:var(--green-bg);color:var(--green-text)}
+.p-blue{background:var(--blue-bg);color:var(--blue-text)}
+.p-gray{background:var(--surface-3);color:var(--text-2);border:1px solid var(--border-soft)}
+.p-teal{background:var(--teal-bg);color:var(--teal-text)}
+.p-violet{background:var(--violet-bg);color:var(--violet-text)}
+
+/* ── alert banner ── */
+.alert{border-radius:var(--r-md);padding:12px 16px;display:flex;align-items:flex-start;gap:10px;border:1px solid;margin-bottom:14px}
+.alert.a-red{background:var(--red-bg);border-color:var(--red-border)}
+.alert.a-amber{background:var(--amber-bg);border-color:var(--amber-border)}
+.alert.a-green{background:var(--green-bg);border-color:var(--green-border)}
+.alert-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.alert-title{font-size:13.5px;font-weight:600;margin-bottom:1px}
+.a-red .alert-title{color:var(--red-text)}
+.a-amber .alert-title{color:var(--amber-text)}
+.a-green .alert-title{color:var(--green-text)}
+.alert-desc{font-size:12.5px}
+.a-red .alert-desc{color:#b91c1c}
+.a-amber .alert-desc{color:#b45309}
+.a-green .alert-desc{color:var(--green-text)}
+
+/* ── metrics row ── */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.metric{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--r-md);padding:12px 14px}
+.met-label{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);margin-bottom:5px}
+.met-val{font-size:21px;font-weight:600;letter-spacing:-.03em;line-height:1;margin-bottom:3px}
+.mv-red{color:var(--red-mid)} .mv-amber{color:var(--amber-mid)} .mv-green{color:var(--green-mid)} .mv-blue{color:var(--blue-mid)}
+.met-sub{font-size:11px;color:var(--text-3)}
+.sub-up{color:var(--red-mid)} .sub-down{color:var(--green-mid)}
+
+/* ── exception table ── */
+.exc-wrap{overflow-x:auto}
+.exc-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.exc-table thead th{padding:8px 14px;text-align:left;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);background:var(--surface-2);border-bottom:1px solid var(--border-soft)}
+.exc-table tbody tr{border-bottom:1px solid var(--border-soft);cursor:pointer;transition:background .1s}
+.exc-table tbody tr:last-child{border-bottom:none}
+.exc-table tbody tr:hover{background:var(--surface-2)}
+.exc-table tbody tr.selected{background:#eff6ff;border-left:3px solid #2563eb}
+.exc-table td{padding:10px 14px;vertical-align:middle}
+.exc-table tbody tr.selected td:first-child{padding-left:11px}
+.sku-name{font-weight:500;color:var(--text-1);font-size:12.5px}
+.sku-seg{font-size:11px;color:var(--text-3);margin-top:1px}
+.tier-t1{background:#e0f2fe;color:#0369a1}
+.tier-t2{background:var(--amber-bg);color:var(--amber-text)}
+.tier-t3{background:var(--red-bg);color:var(--red-text)}
+
+/* ── 2 col layout ── */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.full-col{grid-column:1/-1}
+
+/* ── rca card ── */
+.rca-finding{font-size:13px;line-height:1.7;color:var(--text-1);margin-bottom:12px}
+.evidence-list{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.ev-item{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text-2)}
+.ev-dot{width:5px;height:5px;border-radius:50%;background:var(--ink-300);flex-shrink:0;margin-top:6px}
+.conf-row{display:flex;align-items:center;gap:10px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:var(--r-sm);padding:8px 12px}
+.conf-lbl{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3)}
+.conf-bar-bg{flex:1;height:5px;background:var(--ink-100);border-radius:10px;overflow:hidden}
+.conf-bar-fill{height:100%;border-radius:10px}
+.conf-val{font-size:12.5px;font-weight:600;min-width:32px;text-align:right}
+
+/* ── action items ── */
+.action-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px 16px}
+.action-item{border:1px solid var(--border-soft);border-radius:var(--r-md);padding:11px 13px}
+.act-tier{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;margin-bottom:5px}
+.at-t1{color:#0369a1} .at-t2{color:var(--amber-text)} .at-t3{color:var(--red-text)}
+.act-title{font-size:12.5px;font-weight:600;color:var(--text-1);margin-bottom:3px}
+.act-desc{font-size:11.5px;color:var(--text-2);line-height:1.5}
+.act-status{margin-top:7px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px}
+.as-done{color:var(--green-mid)} .as-pending{color:var(--amber-mid)} .as-review{color:var(--red-mid)}
+
+/* ── context banner (selected exception) ── */
+.exc-context{background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:var(--r-md);padding:10px 14px;margin-bottom:14px;font-size:12.5px;color:var(--blue-text);display:none}
+.exc-context.visible{display:flex;align-items:center;gap:8px}
+.exc-context strong{font-weight:600}
+
+/* ── agent blocks ── */
+.agent-block{margin-bottom:10px}
+.agent-head{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--r-md);padding:11px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .12s;user-select:none}
+.agent-head:hover{background:var(--surface-2)}
+.agent-head.open{border-radius:var(--r-md) var(--r-md) 0 0;border-bottom-color:transparent;background:var(--surface-2)}
+.agent-idx{width:22px;height:22px;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.agent-name{font-size:13px;font-weight:600;flex:1;color:var(--text-1)}
+.agent-summary{font-size:12px;color:var(--text-2);flex:2;padding:0 8px}
+.agent-chevron{font-size:13px;color:var(--text-3);transition:transform .2s}
+.agent-head.open .agent-chevron{transform:rotate(180deg)}
+.agent-body{display:none;background:var(--surface);border:1px solid var(--border-soft);border-top:none;border-radius:0 0 var(--r-md) var(--r-md);padding:14px}
+.agent-body.open{display:block}
+
+/* ── react trace ── */
+.trace{display:flex;flex-direction:column;gap:0}
+.tstep{display:grid;grid-template-columns:18px 1fr;gap:0 10px;position:relative}
+.tstep::before{content:'';position:absolute;left:8px;top:22px;bottom:0;width:1px;background:var(--border-soft)}
+.tstep:last-child::before{display:none}
+.tdot-col{display:flex;flex-direction:column;align-items:center;padding-top:5px}
+.tdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;border:2px solid}
+.d-thought{background:transparent;border-color:var(--ink-200)}
+.d-action{background:var(--blue-mid);border-color:var(--blue-mid)}
+.d-obs{background:var(--green-mid);border-color:var(--green-mid)}
+.d-finding{background:var(--amber-mid);border-color:var(--amber-mid)}
+.tcontent{padding-bottom:12px}
+.tkind{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;margin-bottom:2px}
+.k-thought{color:var(--text-3)} .k-action{color:var(--blue-mid)} .k-obs{color:var(--green-mid)} .k-finding{color:var(--amber-mid)}
+.ttext{font-size:12.5px;color:var(--text-2);line-height:1.55}
+.tcode{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:var(--r-sm);padding:5px 9px;color:var(--text-1);margin-top:3px}
+
+/* ── rag ── */
+.pipeline-row{display:flex;align-items:center;gap:0;margin-bottom:14px}
+.p-stage{flex:1;text-align:center;padding:7px 4px;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);background:var(--surface-2);border:1px solid var(--border-soft)}
+.p-stage:first-child{border-radius:var(--r-sm) 0 0 var(--r-sm)}
+.p-stage:last-child{border-radius:0 var(--r-sm) var(--r-sm) 0}
+.p-arrow{font-size:11px;color:var(--text-3);padding:0 4px;flex-shrink:0}
+.rag-funnel{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.rf-item{text-align:center;background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--r-sm);padding:10px 6px}
+.rf-val{font-size:18px;font-weight:600;color:var(--text-1);letter-spacing:-.02em}
+.rf-lbl{font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.07em;margin-top:2px}
+.query-box{background:var(--surface-2);border:1px solid var(--border-soft);border-radius:var(--r-sm);padding:9px 12px;margin-bottom:12px}
+.qb-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);margin-bottom:3px}
+.qb-text{font-family:var(--mono);font-size:12px;color:var(--text-2)}
+.qb-filters{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.qb-tag{font-size:10.5px;padding:2px 7px;border-radius:7px;font-weight:500}
+.qt-blue{background:var(--blue-bg);color:var(--blue-text)}
+.qt-gray{background:var(--surface-3);color:var(--text-2);border:1px solid var(--border-soft)}
+.chunk-card{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--r-md);padding:12px 14px;margin-bottom:8px}
+.chunk-card:last-child{margin-bottom:0}
+.ck-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:7px}
+.ck-source{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:2px}
+.ck-id{font-family:var(--mono);font-size:11px;color:var(--blue-mid)}
+.ck-sim{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.sim-label{font-size:10px;color:var(--text-3);white-space:nowrap}
+.sim-bar-bg{width:50px;height:4px;background:var(--ink-100);border-radius:10px;overflow:hidden}
+.sim-bar-fill{height:100%;border-radius:10px;background:var(--green-mid)}
+.sim-val{font-size:12px;font-weight:600;color:var(--green-mid);min-width:30px;text-align:right}
+.ck-preview{font-size:12.5px;color:var(--text-2);line-height:1.6}
+.ck-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+
+/* ── eval ── */
+.eval-hero{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--r-lg);padding:18px 20px;display:flex;align-items:center;gap:24px;margin-bottom:14px}
+.score-ring{position:relative;width:76px;height:76px;flex-shrink:0}
+.score-ring svg{transform:rotate(-90deg)}
+.score-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.score-num{font-size:20px;font-weight:700;letter-spacing:-.03em}
+.score-denom{font-size:10px;color:var(--text-3)}
+.eval-dims{flex:1;display:flex;flex-direction:column;gap:9px}
+.dim-row{display:flex;align-items:center;gap:10px}
+.dim-name{font-size:12px;color:var(--text-2);width:210px;flex-shrink:0}
+.dim-bar-bg{flex:1;height:6px;background:var(--ink-100);border-radius:10px;overflow:hidden}
+.dim-bar{height:100%;border-radius:10px}
+.db-pass{background:var(--green-mid)} .db-warn{background:var(--amber-mid)} .db-fail{background:var(--red-mid)}
+.dim-val{font-size:12px;font-weight:600;min-width:34px;text-align:right}
+.dv-pass{color:var(--green-mid)} .dv-warn{color:var(--amber-mid)} .dv-fail{color:var(--red-mid)}
+.eval-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.eval-metric{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--r-md);padding:13px 15px}
+.em-label{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);margin-bottom:5px}
+.em-val{font-size:19px;font-weight:600;letter-spacing:-.02em;margin-bottom:3px}
+.em-sub{font-size:11.5px;color:var(--text-2);line-height:1.5}
+.em-note{font-size:11px;color:var(--text-3);margin-top:5px;padding-top:5px;border-top:1px solid var(--border-soft)}
+
+/* ── empty state ── */
+.empty{padding:52px 20px;text-align:center}
+.empty-icon{font-size:32px;opacity:.25;margin-bottom:10px}
+.empty-title{font-size:14px;font-weight:500;color:var(--text-2);margin-bottom:5px}
+.empty-sub{font-size:12.5px;color:var(--text-3)}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- sidebar -->
+<aside class="sidebar">
+  <div class="sb-top">
+    <div class="sb-brand">Keystone<span>.ai</span></div>
+    <div class="sb-sub">Forecasting Agent</div>
+  </div>
+
+  <div class="sb-section">
+    <div class="sb-label">Active cycle</div>
+    <div class="cycle-card">
+      <div class="cc-row"><span class="cc-k">Client</span><span class="cc-v">Hershey's</span></div>
+      <div class="cc-row"><span class="cc-k">Cycle</span><span class="cc-v">HC-2024-047</span></div>
+      <div class="cc-row"><span class="cc-k">SKUs scanned</span><span class="cc-v">2,400</span></div>
+      <div class="cc-row"><span class="cc-k">Agents active</span><span class="cc-v">4 of 5</span></div>
+    </div>
+  </div>
+
+  <div class="sb-section">
+    <div class="sb-label">System</div>
+    <div class="cycle-card">
+      <div class="cc-row"><span class="cc-k">Backend</span><span class="cc-v"><span class="status-dot"></span>Live</span></div>
+      <div class="cc-row"><span class="cc-k">Vector store</span><span class="cc-v">Qdrant</span></div>
+      <div class="cc-row"><span class="cc-k">LLM</span><span class="cc-v">Claude 3.5</span></div>
+      <div class="cc-row"><span class="cc-k">Model</span><span class="cc-v">AutoGluon v2.3</span></div>
+    </div>
+  </div>
+
+  <button class="run-btn" id="runBtn" onclick="runCycle()">
+    <div class="spin"></div>
+    <span class="run-label-idle">&#9654; Run cycle HC-2024-047</span>
+    <span class="run-label-busy">Running agents…</span>
+  </button>
+
+  <div class="sb-footer">Keystone Platform v2.3</div>
+</aside>
+
+<!-- topbar -->
+<header class="topbar">
+  <button class="tab active" onclick="switchTab('planner',this)">Planner view</button>
+  <button class="tab" onclick="switchTab('reasoning',this)">Agent reasoning</button>
+  <button class="tab" onclick="switchTab('rag',this)">RAG retrieval</button>
+  <button class="tab" onclick="switchTab('eval',this)">Eval scores</button>
+  <div class="topbar-right">
+    <span class="selected-exc-pill" id="excPill"></span>
+    <span class="cycle-pill">Cycle HC-2024-047</span>
+    <span class="role-pill rp-planner">Demand Planner</span>
+  </div>
+</header>
+
+<!-- main -->
+<main class="main">
+
+  <!-- PLANNER VIEW -->
+  <div class="panel active" id="panel-planner">
+    <div id="planner-content">
+      <div class="empty"><div class="empty-icon">&#9654;</div><div class="empty-title">Waiting for cycle run</div><div class="empty-sub">Click "Run cycle" to start the agent pipeline and see results.</div></div>
+    </div>
+  </div>
+
+  <!-- AGENT REASONING -->
+  <div class="panel" id="panel-reasoning">
+    <div id="reasoning-content">
+      <div class="empty"><div class="empty-icon">&#9654;</div><div class="empty-title">Waiting for cycle run</div><div class="empty-sub">Run the cycle first, then select an exception to trace its reasoning.</div></div>
+    </div>
+  </div>
+
+  <!-- RAG RETRIEVAL -->
+  <div class="panel" id="panel-rag">
+    <div id="rag-content">
+      <div class="empty"><div class="empty-icon">&#9654;</div><div class="empty-title">Waiting for cycle run</div><div class="empty-sub">Run the cycle first, then select an exception to see the knowledge retrieved.</div></div>
+    </div>
+  </div>
+
+  <!-- EVAL SCORES -->
+  <div class="panel" id="panel-eval">
+    <div id="eval-content">
+      <div class="empty"><div class="empty-icon">&#9654;</div><div class="empty-title">Waiting for cycle run</div><div class="empty-sub">Run the cycle first, then select an exception to see eval scores.</div></div>
+    </div>
+  </div>
+
+</main>
+</div>
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const CYCLE = {
+  alert: {
+    level:'a-red', icon:'⚠',
+    title:'3 exceptions found in cycle HC-2024-047 — action required',
+    desc:"Agent pipeline completed across 2,400 Hershey's SKUs. Three issues found: Kroger sales data has been missing 11 days (urgent — suppress from replenishment), seasonal model weights are stale for Q4 (retrain needed), and a Valentine's Day promo spike is expected and normal (planner review of override value). Select an exception below to trace the full diagnosis."
+  },
+  metrics:[
+    {label:'SKUs flagged',val:'23',cls:'mv-red',sub:'↑18 vs last cycle',subCls:'sub-up'},
+    {label:'Exceptions found',val:'3',cls:'mv-amber',sub:'Across 3 root cause types',subCls:''},
+    {label:'Autonomous actions',val:'3',cls:'mv-green',sub:'T1 — no approval needed',subCls:''},
+    {label:'Pending approvals',val:'5',cls:'mv-blue',sub:'T2 items awaiting review',subCls:''}
+  ]
+};
+
+// Each exception = one end-to-end story
+const EXCEPTIONS = [
+  {
+    id:'exc-1',
+    sku:'KIS-YORK-PEPPERMINT-12',
+    segment:'Chocolate seasonal SKUs',
+    sev:'HIGH', sevCls:'p-red',
+    type:'data_issue',
+    tier:'T3', tierCls:'tier-t3',
+    diagnosis:"Kroger stopped sending sales data 11 days ago — these forecasts are based on incomplete actuals and should not be used for replenishment until fixed",
+
+    // planner tab
+    alert:{level:'a-red',icon:'⚠',title:'Do not use these forecasts — Kroger sales data has been missing for 11 days',
+      desc:'Kroger has not sent point-of-sale data since October 17th. The forecasting model ran without 11 days of actual sales, so its output for chocolate seasonal SKUs at Kroger is unreliable. The agent has suppressed these SKUs from flowing into replenishment and created a backfill request. No action needed from you until the backfill is confirmed.'},
+    rca:{
+      finding:'<strong>The forecast for these SKUs is wrong because Kroger stopped sending sales data 11 days ago.</strong> A data pipeline job that collects Kroger point-of-sale data failed on October 17th and never recovered. The model ran its normal cycle but trained on 11 days of missing actuals — so its output is systematically biased for all 18 chocolate seasonal SKUs sold at Kroger. The fix is straightforward: manually recover the missing sales data from the Kroger vendor portal, then re-run. The agent has seen this exact failure before (incident #89, 8 months ago) — accuracy recovered within one cycle after backfill.',
+      evidence:['Kroger data last received: 11 days ago (October 17th)','Pipeline job failure confirmed: connection timeout, no automatic recovery','18 chocolate seasonal SKUs at Kroger affected — missing 11 days of sales','This has happened before: incident #89 resolved via manual backfill, 1-cycle recovery'],
+      confidence:94, layer:'Data pipeline — Layer 1', confCls:'mv-green'
+    },
+    actions:[
+      {tier:'T1',tierCls:'at-t1',tierLabel:'Autonomous',title:'Exception queue published',desc:'23 exceptions ranked by severity, sent to planner UI.',status:'✓ Done',statusCls:'as-done'},
+      {tier:'T1',tierCls:'at-t1',tierLabel:'Autonomous',title:'3 SKUs suppressed',desc:'Low-confidence SKUs (quality score 0.41) suppressed from ERP downstream.',status:'✓ Done',statusCls:'as-done'},
+      {tier:'T1',tierCls:'at-t1',tierLabel:'Autonomous',title:'Incident tagged',desc:'RCA logged to knowledge base with evidence. Available for future pattern matching.',status:'✓ Done',statusCls:'as-done'},
+      {tier:'T2',tierCls:'at-t2',tierLabel:'Recommend + approve',title:'Actuals backfill request',desc:'Manual backfill from Kroger vendor portal for 18 affected SKUs. Pre-filled, awaiting DS approval.',status:'⏳ Pending DS',statusCls:'as-pending'},
+      {tier:'T2',tierCls:'at-t2',tierLabel:'Recommend + approve',title:'Segment suppression',desc:'Suppress chocolate seasonal from downstream until backfill confirmed.',status:'⏳ Pending planner',statusCls:'as-pending'},
+      {tier:'T3',tierCls:'at-t3',tierLabel:'Surface only',title:'Engineering ticket created',desc:'Kroger POS ingestion — connection timeout. Retry logic review + stale feed alerting at 48h threshold.',status:'🔴 For engineering',statusCls:'as-review'}
+    ],
+
+    // reasoning tab
+    agentSummary:'Kroger data pipeline failure identified as the root cause. Agent stopped diagnosis at Layer 1 — no model or feature issue to investigate. Backfill request pre-filled, engineering ticket raised. Confidence 94%.',
+    agents:[
+      {name:'Trigger Router',idxBg:'#e0f2fe',idxColor:'#0369a1',result:'2 agents activated',resultCls:'p-blue',
+        summary:'Accuracy dropped + 23 SKUs flagged → activates Exception Triage and RCA Diagnostic',
+        steps:[
+          {kind:'thought',text:'Reading forecast summary. Checking activation conditions for cycle HC-2024-047.'},
+          {kind:'action',code:"check_thresholds(cycle='HC-2024-047', client='HERSHEYS')"},
+          {kind:'obs',text:'23 SKUs above delta threshold (0.15). Segment chocolate_seasonal: wMAPE delta +3.6 pts (threshold: 2.0). Bias +0.21. 2 data quality flags.'},
+          {kind:'finding',text:'Activate Exception Triage (delta + data quality flags) and RCA Diagnostic (wMAPE breach). Retrain/Override not triggered yet.'}
+        ]
+      },
+      {name:'RCA Diagnostic Agent',idxBg:'#fef3c7',idxColor:'#b45309',result:'Root cause: data pipeline',resultCls:'p-amber',
+        summary:'Checked retailers in order — Kroger data missing 11 days. Stopped there. No model or feature investigation needed.',
+        steps:[
+          {kind:'thought',text:'Layer 1: data pipeline health. Checking all Hershey\'s retailers in order.'},
+          {kind:'action',code:"check_feed_freshness('WALMART', 'HERSHEYS')"},
+          {kind:'obs',text:'Last successful: 2 hours ago. Fresh.'},
+          {kind:'action',code:"check_feed_freshness('KROGER', 'HERSHEYS')"},
+          {kind:'obs',text:'Last successful: 11 days ago. STALE — feed failure on [date].'},
+          {kind:'thought',text:'Kroger stale. Checking pipeline logs to confirm root cause.'},
+          {kind:'action',code:"check_pipeline_logs('chocolate_seasonal', 'last_14_days')"},
+          {kind:'obs',text:'Argo job failure. Kroger POS ingestion: connection timeout. No retry successful. 18 chocolate seasonal SKUs affected.'},
+          {kind:'action',code:"get_rag_context('Kroger feed failure chocolate seasonal prior incidents', 'HERSHEYS')"},
+          {kind:'obs',text:'Prior incident #89 (8 months ago): same pattern. Resolution: manual actuals backfill from Kroger portal. wMAPE recovered within 1 cycle.'},
+          {kind:'finding',text:'Root cause confirmed at Layer 1 — data pipeline. Confidence 0.94. Known pattern with documented fix. Layers 2–3 not needed.'}
+        ]
+      },
+      {name:'Eval Agent',idxBg:'#dcfce7',idxColor:'#15803d',result:'Score 91/100',resultCls:'p-green',
+        summary:'All three eval dimensions above threshold. No human review required. Incident logged.',
+        steps:[
+          {kind:'action',code:'score_faithfulness(rca_output, evidence_list)'},
+          {kind:'obs',text:'0.94 — all claims supported by evidence. Kroger staleness confirmed by pipeline logs. Prior incident cited as direct precedent.'},
+          {kind:'action',code:'score_layer_sequence(rca_output)'},
+          {kind:'obs',text:'1.0 — Layer 1 checked first, stopped correctly at root cause. Layer 4 confirmed in parallel. Correct sequence.'},
+          {kind:'action',code:'score_tier_classification(tier_actions)'},
+          {kind:'obs',text:'0.90 — all tier classifications correct. Reversible actions (queue publish, suppression) → T1. Backfill request → T2. Engineering ticket → T3.'},
+          {kind:'finding',text:'Overall score 91/100. No action required. Incident logged to knowledge base.'}
+        ]
+      }
+    ],
+
+    // rag tab
+    rag:{
+      query:'Kroger feed failure chocolate seasonal Hersheys prior incidents',
+      intent:'data_issue resolution precedent',
+      filters:['client_id: HERSHEYS','source_type: incident_record, pipeline_log'],
+      stats:{total:15000,filtered:340,topK:20,reranked:3},
+      latency:'312ms',
+      chunks:[
+        {source:'Incident Record',id:'INC-089 / chunk_1',sim:0.91,
+          preview:'Kroger POS feed failure — connection timeout. Argo job retry logic failed silently. Resolution path: manual actuals backfill from Kroger vendor portal, confirmed within 18 hours. wMAPE recovered within 1 cycle post-backfill.',
+          tags:['HERSHEYS','data_issue','kroger'],date:'2024-02-14'},
+        {source:'Override History',id:'OVR-031 / chunk_2',sim:0.84,
+          preview:'Post INC-089: override applied to chocolate seasonal for 2 weeks. wMAPE recovered from 14.8 → 11.3 within cycle 48. Override expired per schedule with no accuracy degradation.',
+          tags:['HERSHEYS','override','chocolate_seasonal'],date:'2024-02-28'},
+        {source:'Data Readiness Report',id:'RR-047 / chunk_3',sim:0.77,
+          preview:'Validation post-backfill: Kroger actuals restored. Schema validation APPROVED. Temporal integrity APPROVED. Feature readiness CONDITIONAL — seasonal weights require Q4 refresh.',
+          tags:['HERSHEYS','readiness','kroger'],date:'2024-03-01'}
+      ]
+    },
+
+    // eval tab
+    eval:{
+      overall:91,
+      dims:[
+        {name:'Diagnostic faithfulness',val:0.94,cls:'pass'},
+        {name:'Layer sequence compliance',val:1.0,cls:'pass'},
+        {name:'Tier classification accuracy',val:0.90,cls:'pass'}
+      ],
+      verdict:'All dimensions above threshold. No human review required. Root cause correctly stopped at Layer 1. Incident logged to knowledge base for future retrieval.',
+      improvement:'Recommendation: add a Kroger feed staleness alert at the 48-hour mark to the Data Readiness Agent. Current pattern: degradation accumulates for 11 days before detection.',
+      extraMetrics:[
+        {label:'Evidence utilization rate',val:'3 / 3',cls:'mv-green',
+          sub:'All retrieved chunks cited in reasoning',
+          note:'High utilization — knowledge base had directly relevant incident records. When this is low, it signals the knowledge base lacks content for the field being queried.'},
+        {label:'Field-level grounding failures',val:'0 / 23',cls:'mv-green',
+          sub:'No undescribed fields in diagnosis path',
+          note:'0% of diagnostic failures involved undescribed catalog fields. When this is high (>60%), it indicates the catalog is missing descriptions for fields the agent relies on.'},
+        {label:'Retrieval cosine similarity',val:'0.84 avg',cls:'mv-green',
+          sub:'Top chunk similarity to query vector',
+          note:'0.91 / 0.84 / 0.77 across 3 chunks. High first-chunk similarity confirms the knowledge base had strong coverage for this known failure pattern.'}
+      ]
+    }
+  },
+
+  {
+    id:'exc-2',
+    sku:'KIS-REESE-SEASONAL-GROUP',
+    segment:'Chocolate seasonal SKUs',
+    sev:'HIGH', sevCls:'p-red',
+    type:'feature_drift',
+    tier:'T2', tierCls:'tier-t2',
+    diagnosis:"Model is systematically underforecasting Q4 holiday demand — seasonal uplift weights haven't been refreshed since June and are missing the Q4 pattern entirely",
+
+    alert:{level:'a-amber',icon:'⚡',title:"Model is underforecasting holiday demand — seasonal weights are 4 months out of date",
+      desc:"The forecasting model for Hershey's chocolate seasonal SKUs was last updated in June. It is missing the Q4 holiday uplift pattern — the higher baseline demand that every year precedes Halloween, Thanksgiving, and Christmas. The model doesn't know Q4 is different, so it's underforecasting. The fix is a model retrain with refreshed seasonal weights, not a one-off override. This problem will get worse each cycle until the retrain runs."},
+    rca:{
+      finding:"<strong>The model is underforecasting because its seasonal demand patterns are 4 months stale.</strong> All data pipelines are healthy — Walmart, Target, Kroger, and Costco feeds are all current. The problem is inside the model itself: the seasonal uplift weights that tell it 'Q4 demand is higher than the rest of the year' were last calculated in June and never refreshed for the holiday period. The model is flying blind on the most important sales quarter of the year. Forecast bias has worsened every cycle for 4 straight cycles (+0.09 → +0.14 → +0.19 → +0.24) — a pattern that cannot be fixed by a simple correction. A model retrain with updated seasonal weights is the only resolution. The same problem occurred last year (incident #031) and a retrain recovered accuracy within 2 cycles.",
+      evidence:['All retailer data feeds confirmed current — data pipeline is not the issue','Seasonal uplift weights last refreshed: June 2024 (4 months ago)','Q4 uplift pattern missing from model — the model treats October–December like any other quarter','Forecast bias worsening every cycle for 4 straight cycles: +0.09 → +0.14 → +0.19 → +0.24','Prior incident #031 (same cause, last year): retrain with seasonal recalibration restored accuracy in 2 cycles'],
+      confidence:89, layer:'Feature drift — Layer 2', confCls:'mv-amber'
+    },
+    actions:[
+      {tier:'T1',tierCls:'at-t1',tierLabel:'Autonomous',title:'Incident tagged',desc:'Seasonal weight staleness RCA logged to knowledge base. Linked to prior incident #031 for pattern matching in future cycles.',status:'✓ Done',statusCls:'as-done'},
+      {tier:'T2',tierCls:'at-t2',tierLabel:'Recommend + approve',title:'Retrain request pre-filled',desc:'hersheys_autogluon_v12 · 18-month window · seasonal weight recalibration required. Queued for DS approval. Est. runtime 6–8h.',status:'⏳ Pending DS',statusCls:'as-pending'},
+      {tier:'T2',tierCls:'at-t2',tierLabel:'Recommend + approve',title:'Interim override suggested',desc:'While retrain is running, apply +18% scalar override to chocolate seasonal SKUs for the next 2 cycles. Based on prior year Q4 uplift baseline.',status:'⏳ Pending planner',statusCls:'as-pending'},
+      {tier:'T3',tierCls:'at-t3',tierLabel:'Surface only',title:'PM flag: seasonal refresh schedule',desc:'Seasonal weights have no automated refresh schedule. Recommend adding an August refresh checkpoint to the Data Readiness Agent to catch this before Q4 every year.',status:'🔴 For PM review',statusCls:'as-review'}
+    ],
+
+    agentSummary:"Data pipelines all clean. Model feature inspection found seasonal uplift weights 4 months stale — Q4 holiday pattern missing. Bias worsening 4 cycles straight. Retrain required, interim override pre-filled. Confidence 89%.",
+    agents:[
+      {name:'RCA Diagnostic Agent',idxBg:'#fef3c7',idxColor:'#b45309',result:'Root cause: feature drift',resultCls:'p-amber',
+        summary:"All feeds fresh → checked model features → seasonal weights last updated June, Q4 uplift pattern absent",
+        steps:[
+          {kind:'thought',text:"Layer 1: checking data pipeline health. Need to rule out a data problem before looking at the model."},
+          {kind:'action',code:"check_feed_freshness('ALL_RETAILERS', 'HERSHEYS')"},
+          {kind:'obs',text:'Walmart: 2h ago. Target: 3h ago. Kroger: 4h ago. Costco: 2h ago. All feeds current. No pipeline failures.'},
+          {kind:'thought',text:'Layer 1 clean — data is not the problem. Proceeding to Layer 2: checking model input features for drift.'},
+          {kind:'action',code:"check_feature_drift('hsy_ssnl_uplift_wt', 'chocolate_seasonal', current, prior_q4)"},
+          {kind:'obs',text:'Seasonal uplift weight drift score: 0.84 (threshold: 0.50). Weights last refreshed: June 2024. Q4 uplift coefficient is absent from current model — it was not captured in the June training window.'},
+          {kind:'action',code:"get_rag_context('Hersheys seasonal weight staleness Q4 uplift prior incidents', 'HERSHEYS')"},
+          {kind:'obs',text:'Prior incident #031 (11 months ago): same root cause — seasonal weights missed August refresh. Resolution: retrain with seasonal recalibration + interim override. Accuracy recovered in 2 cycles.'},
+          {kind:'finding',text:'Root cause at Layer 2 — seasonal feature staleness. Q4 uplift pattern missing from model weights. Structural degradation across 4 cycles. Override alone is insufficient. Retrain required. Confidence 0.89.'}
+        ]
+      },
+      {name:'Retrain / Override Agent',idxBg:'#ede9fe',idxColor:'#7c3aed',result:'Retrain + interim override',resultCls:'p-violet',
+        summary:'4-cycle worsening trend across 30% of SKU scope → override alone ruled out. Retrain config pre-filled. Interim override for coverage while retrain runs.',
+        steps:[
+          {kind:'action',code:"get_degradation_history('chocolate_seasonal_group', n_cycles=4)"},
+          {kind:'obs',text:'wMAPE: 11.2 → 12.1 → 13.4 → 14.8. Bias: +0.09 → +0.14 → +0.19 → +0.24. Monotonically worsening. Affects 30% of Hershey\'s SKU scope.'},
+          {kind:'thought',text:'Degradation is broad (30%) and sustained (4 cycles, worsening). A scalar override cannot fix missing Q4 uplift weights across 30% of SKUs — the model fundamentally does not know Q4 demand is higher. Retrain required. But retrain takes 6–8 hours, so an interim override bridges the gap.'},
+          {kind:'action',code:"get_rag_context('Hersheys seasonal retrain prior config accuracy lift', 'HERSHEYS')"},
+          {kind:'obs',text:'Prior retrain INC-031 (same driver): 18-month window, seasonal recalibration. wMAPE improvement: 2.4 pts within 2 cycles. Interim override of +18% applied during retrain window.'},
+          {kind:'finding',text:'Recommendation: RETRAIN (primary) + INTERIM OVERRIDE (bridge). Retrain: 18-month window, seasonal weight recalibration. Override: +18% scalar on chocolate seasonal for 2 cycles. Expected improvement: 2.0–2.5 wMAPE pts. Both pre-filled for approval.'}
+        ]
+      }
+    ],
+
+    rag:{
+      query:'Hersheys seasonal uplift weight staleness Q4 holiday chocolate retrain prior decision',
+      intent:'feature drift — seasonal weight recalibration precedent',
+      filters:['client_id: HERSHEYS','source_type: incident_record, retrain_decision, eval_log'],
+      stats:{total:15000,filtered:260,topK:20,reranked:3},
+      latency:'298ms',
+      chunks:[
+        {source:'Incident Record',id:'INC-031 / chunk_1',sim:0.93,
+          preview:'Seasonal model weights missed August refresh — Q4 uplift coefficient absent from training window. Root cause: no automated refresh schedule. Resolution: retrain with 18-month window + seasonal recalibration. Interim +18% override applied during retrain. Accuracy recovered in 2 cycles.',
+          tags:['HERSHEYS','feature_drift','seasonal'],date:'2023-11-14'},
+        {source:'Retrain Record',id:'RT-HSY-2023 / chunk_2',sim:0.87,
+          preview:'Retrain triggered: seasonal weight staleness. Training window: 18 months. Seasonal uplift recalibrated against 3 prior Q4 periods. Post-retrain wMAPE improvement: 2.4 pts within 2 cycles. Bias resolved by cycle 3.',
+          tags:['HERSHEYS','retrain','seasonal'],date:'2023-11-21'},
+        {source:'Model Eval Log',id:'EVAL-HC-044 / chunk_3',sim:0.81,
+          preview:'Chocolate seasonal wMAPE trend: 4-cycle monotonic increase. Seasonal coefficient weight shows highest feature importance for Q4 SKUs. Feature drift score 0.84 confirms Q4 uplift pattern missing from current model.',
+          tags:['HERSHEYS','eval','chocolate_seasonal'],date:'2024-10-25'}
+      ]
+    },
+
+    eval:{
+      overall:89,
+      dims:[
+        {name:'Diagnostic faithfulness',val:0.92,cls:'pass'},
+        {name:'Layer sequence compliance',val:1.0,cls:'pass'},
+        {name:'Tier classification accuracy',val:0.85,cls:'warn'}
+      ],
+      verdict:'Faithfulness and sequence compliance above threshold. Tier classification flagged — the PM seasonal refresh alert was placed at T3 (surface only) but given this is a recurring annual failure, T2 (recommend + approve with a scheduled fix) may be more appropriate.',
+      improvement:'This is the second consecutive year this exact failure has occurred (INC-031 last year, now this cycle). The recurring pattern suggests the fix is not just a retrain but adding an automated August seasonal weight refresh check to the Data Readiness Agent — so the problem is caught before Q4 begins, not after 4 cycles of degradation.',
+      extraMetrics:[
+        {label:'Evidence utilization rate',val:'3 / 3',cls:'mv-green',
+          sub:'All retrieved chunks cited in reasoning',
+          note:'All 3 chunks contributed: INC-031 confirmed known pattern, retrain record provided config precedent, eval log confirmed feature importance ranking. High utilization reflects strong knowledge base coverage for this failure type.'},
+        {label:'Field-level grounding failures',val:'0 / 6',cls:'mv-green',
+          sub:'No undescribed fields in diagnosis path',
+          note:'hsy_ssnl_uplift_wt is documented in the catalog with an LLM interpretability note explaining the Q4 uplift multiplier. The agent correctly identified drift and interpreted the coefficient absence — grounding prevented a misdiagnosis as a data issue.'},
+        {label:'Retrieval cosine similarity',val:'0.87 avg',cls:'mv-green',
+          sub:'Top chunk similarity to query vector',
+          note:'0.93 / 0.87 / 0.81 across 3 chunks. Strong first-chunk match confirms the knowledge base has well-indexed seasonal failure records. The 0.81 eval log chunk is still above the 0.75 retrieval confidence threshold.'}
+      ]
+    }
+  },
+
+  {
+    id:'exc-3',
+    sku:'KIS-KISSES-BULK-24',
+    segment:'Chocolate seasonal SKUs',
+    sev:'MED', sevCls:'p-amber',
+    type:'demand_signal',
+    tier:'T2', tierCls:'tier-t2',
+    diagnosis:"Forecast spike is expected — Valentine's Day promo is driving +22% uplift, in line with last year. Review the override value.",
+
+    alert:{level:'a-green',icon:'✓',title:"Nothing is wrong — this spike is the Valentine's Day promotion",
+      desc:"The +22% forecast increase on chocolate seasonal SKUs is exactly what should be happening. The Valentine's Day promotion is registered for week 6, and last year's uplift for the same event was +18–24%. The forecast is working correctly. What the planner needs to do: review the pre-filled override value (+20%, based on last year's midpoint) and confirm it before the promotion window opens. Separate note: the model has been slightly underforecasting this segment for 2 cycles — flagged for DS to monitor."},
+    rca:{
+      finding:"<strong>The forecast spike is correct — this is a Valentine's Day promotion, not a model error.</strong> The +22% delta on chocolate seasonal SKUs is fully explained by the Valentine's Day promotion registered in the trade calendar for week 6. Last year's uplift for the same promotion was +18–24%, which brackets this year's +22% exactly. Nothing is broken. However, there is a separate secondary concern: the model has produced a small positive bias for 2 straight cycles (+0.09 → +0.18 → +0.21) that is independent of the promo. This won't cause an immediate problem but suggests the model may be slightly miscalibrated on this segment — worth a DS check before it compounds.",
+      evidence:["Valentine's Day promotion registered in trade calendar for week 6 (Feb 12–18)","Last year's chocolate seasonal uplift for the same event: +18–24%","This year's delta +22% — within last year's range, as expected","Data quality score: 0.83 — all feeds current, no pipeline issues","Separate: model bias has trended positive 3 cycles in a row (+0.09 → +0.18 → +0.21)"],
+      confidence:87, layer:'External signal — Layer 4', confCls:'mv-green'
+    },
+    actions:[
+      {tier:'T1',tierCls:'at-t1',tierLabel:'Autonomous',title:'Exception queue published',desc:"Promo context and prior year comparison sent to planner UI automatically.",status:'✓ Done',statusCls:'as-done'},
+      {tier:'T2',tierCls:'at-t2',tierLabel:'Recommend + approve',title:'Override review suggested',desc:"Pre-filled override: +20% scalar on chocolate seasonal (prior year midpoint). Awaiting planner review.",status:'⏳ Pending planner',statusCls:'as-pending'},
+      {tier:'T2',tierCls:'at-t2',tierLabel:'Recommend + approve',title:'DS bias flag queued',desc:'Secondary: persistent positive bias over 2 cycles. DS review recommended for model recalibration assessment.',status:'⏳ Pending DS',statusCls:'as-pending'}
+    ],
+
+    agentSummary:"Trade calendar confirmed Valentine's Day promo explains the +22% spike — this is expected demand, not a model problem. Override value pre-filled for planner review. Small ongoing bias concern routed to DS separately.",
+    agents:[
+      {name:'Exception Triage Agent',idxBg:'#fee2e2',idxColor:'#dc2626',result:'Demand signal',resultCls:'p-blue',
+        summary:"Found trade calendar match — Valentine's Day promo explains the spike. No investigation needed. Override review queued for planner.",
+        steps:[
+          {kind:'action',code:"get_forecast_delta('choc_seasonal_group', 'ALL', 'HC-2024-047')"},
+          {kind:'obs',text:'Average delta +22% vs prior cycle across 18 SKUs. Range: +14% to +31%.'},
+          {kind:'action',code:"get_data_quality_score('choc_seasonal_group', 'HC-2024-047')"},
+          {kind:'obs',text:'Data quality score: 0.83. Above threshold. No feed flags.'},
+          {kind:'action',code:"get_rag_context('chocolate seasonal Valentine Day promo week 6 Hersheys', 'HERSHEYS')"},
+          {kind:'obs',text:"Trade calendar: Valentine's Day promo week 6. Prior year chocolate seasonal uplift: +18–24%."},
+          {kind:'thought',text:'+22% delta is within the prior year promo range. This is demand_signal, not model_issue. But bias trending positive 2 cycles is a separate secondary concern.'},
+          {kind:'finding',text:"Exception: demand_signal. Severity 4.74 → Tier 2. Promo override review for planner. Bias concern routed to DS separately."}
+        ]
+      }
+    ],
+
+    rag:{
+      query:"chocolate seasonal Valentine Day promo week 6 Hersheys prior year uplift",
+      intent:'demand signal verification — promo context',
+      filters:['client_id: HERSHEYS','source_type: reference_doc, override_history'],
+      stats:{total:15000,filtered:180,topK:20,reranked:3},
+      latency:'241ms',
+      chunks:[
+        {source:'Trade Calendar',id:'CAL-2024-W06 / chunk_1',sim:0.95,
+          preview:"Valentine's Day promotional window: Week 6 (Feb 12–18 2024). Retailer scope: Walmart, Target, Kroger. SKU scope: all chocolate seasonal. Historical uplift range: +18–24% vs baseline demand.",
+          tags:['HERSHEYS','promo','chocolate_seasonal'],date:'2024-01-15'},
+        {source:'Override History',id:"OVR-2023-VD / chunk_2",sim:0.88,
+          preview:"Valentine's Day 2023: +21% scalar override applied to chocolate seasonal. Outcome: forecast within 3% of actual. Override expired week 7. No accuracy degradation post-expiry.",
+          tags:['HERSHEYS','override','valentine'],date:'2023-02-20'},
+        {source:'Model Eval Log',id:'EVAL-HC-033 / chunk_3',sim:0.74,
+          preview:"Cycle 33 (Valentine's 2023): chocolate seasonal wMAPE 8.9 — below annual average 11.2. Promo override contributed to accuracy improvement. Model correctly normalized post-promo.",
+          tags:['HERSHEYS','eval','seasonal'],date:'2023-02-28'}
+      ]
+    },
+
+    eval:{
+      overall:87,
+      dims:[
+        {name:'Diagnostic faithfulness',val:0.90,cls:'pass'},
+        {name:'Layer sequence compliance',val:1.0,cls:'pass'},
+        {name:'Tier classification accuracy',val:0.90,cls:'pass'}
+      ],
+      verdict:"All dimensions above threshold. Demand signal correctly identified — the agent retrieved the trade calendar entry and matched it against prior year uplift before classifying. Bias concern correctly separated from the promo classification and sent to DS rather than bundled into the same action.",
+      improvement:"The model has now produced positive bias for 3 straight cycles on this segment. The current rules activate RCA Diagnostic only when wMAPE crosses a threshold — but a persistent bias trend below that threshold is also meaningful. Consider adding a 3-cycle bias trend rule to the Trigger Router so it catches slow-building model miscalibration before it becomes a larger accuracy problem.",
+      extraMetrics:[
+        {label:'Evidence utilization rate',val:'3 / 3',cls:'mv-green',
+          sub:'Trade calendar, override history, eval log all cited',
+          note:'All 3 retrieved chunks contributed to the diagnosis — trade calendar confirmed promo, prior override confirmed expected delta, eval log confirmed post-promo normalization pattern.'},
+        {label:'Field-level grounding failures',val:'0 / 4',cls:'mv-green',
+          sub:'No undescribed fields in reasoning path',
+          note:'wape_delta and demand_signal fields both have catalog descriptions with LLM interpretability notes. Agent correctly applied threshold (0.15) and compared to prior year range.'},
+        {label:'Retrieval cosine similarity',val:'0.86 avg',cls:'mv-green',
+          sub:'Top chunk similarity to query vector',
+          note:'0.95 / 0.88 / 0.74 across 3 chunks. Strong top-chunk match (trade calendar). Third chunk (eval log) lower similarity — still useful for historical context.'}
+      ]
+    }
+  }
+];
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let cycleRan = false;
+let selectedId = null;
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function switchTab(name, btn){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  if(cycleRan && selectedId) renderTabContent(name);
+}
+
+function runCycle(){
+  const btn=document.getElementById('runBtn');
+  btn.classList.add('running');
+  setTimeout(()=>{
+    btn.classList.remove('running');
+    cycleRan=true;
+    selectedId=null;
+    renderPlanner();
+    clearSecondaryPanels();
+  },1500);
+}
+
+function clearSecondaryPanels(){
+  ['reasoning','rag','eval'].forEach(t=>{
+    document.getElementById(t+'-content').innerHTML=`<div class="empty"><div class="empty-icon">↖</div><div class="empty-title">Select an exception</div><div class="empty-sub">Click any row in the exception queue to trace its ${t==='reasoning'?'agent reasoning':t==='rag'?'RAG knowledge retrieval':'eval scores'} end-to-end.</div></div>`;
+  });
+  document.getElementById('excPill').style.display='none';
+}
+
+function selectException(id){
+  selectedId=id;
+  const exc=EXCEPTIONS.find(e=>e.id===id);
+  // highlight row
+  document.querySelectorAll('.exc-table tbody tr').forEach(r=>{
+    r.classList.toggle('selected',r.dataset.excId===id);
+  });
+  // update topbar pill
+  const pill=document.getElementById('excPill');
+  pill.textContent=exc.sku;
+  pill.style.display='inline-flex';
+  // render all tabs for this exception
+  renderPlannerExc(exc);
+  const activeTab=document.querySelector('.tab.active');
+  const tabName=activeTab.getAttribute('onclick').match(/'(\w+)'/)[1];
+  if(tabName==='reasoning') renderReasoning(exc);
+  if(tabName==='rag') renderRag(exc);
+  if(tabName==='eval') renderEval(exc);
+}
+
+function renderTabContent(name){
+  if(!selectedId) return;
+  const exc=EXCEPTIONS.find(e=>e.id===selectedId);
+  if(name==='reasoning') renderReasoning(exc);
+  if(name==='rag') renderRag(exc);
+  if(name==='eval') renderEval(exc);
+}
+
+// ─── PLANNER TAB ──────────────────────────────────────────────────────────────
+function renderPlanner(){
+  const el=document.getElementById('planner-content');
+  const c=CYCLE;
+
+  const alertHtml=`<div class="alert ${c.alert.level}">
+    <div class="alert-icon">${c.alert.icon}</div>
+    <div><div class="alert-title">${c.alert.title}</div><div class="alert-desc">${c.alert.desc}</div></div>
+  </div>`;
+
+  const metricsHtml=`<div class="metrics">${c.metrics.map(m=>`
+    <div class="metric">
+      <div class="met-label">${m.label}</div>
+      <div class="met-val ${m.cls}">${m.val}</div>
+      <div class="met-sub ${m.subCls}">${m.sub}</div>
+    </div>`).join('')}</div>`;
+
+  const excRows=EXCEPTIONS.map(e=>`<tr data-exc-id="${e.id}" onclick="selectException('${e.id}')">
+    <td><div class="sku-name">${e.sku}</div><div class="sku-seg">${e.segment}</div></td>
+    <td><span class="pill ${e.sevCls}">${e.sev}</span></td>
+    <td><span style="font-family:var(--mono);font-size:11.5px;color:var(--text-2)">${e.type}</span></td>
+    <td style="font-size:12.5px;color:var(--text-2);max-width:280px">${e.diagnosis}</td>
+    <td><span class="pill ${e.tierCls==='tier-t1'?'p-blue':e.tierCls==='tier-t2'?'p-amber':'p-red'}">${e.tier}</span></td>
+    <td style="color:var(--blue-mid);font-size:12px;white-space:nowrap">View full story →</td>
+  </tr>`).join('');
+
+  const excCard=`<div class="card">
+    <div class="card-head">
+      <div class="card-title"><div class="card-icon ci-red">⚑</div>Exception queue — cycle HC-2024-047</div>
+      <span class="pill p-gray">${EXCEPTIONS.length} exceptions found</span>
+    </div>
+    <div class="exc-wrap"><table class="exc-table">
+      <thead><tr><th>SKU</th><th>Severity</th><th>Type</th><th>Agent diagnosis</th><th>Tier</th><th></th></tr></thead>
+      <tbody>${excRows}</tbody>
+    </table></div>
+    <div style="padding:9px 14px;background:var(--surface-2);border-top:1px solid var(--border-soft);font-size:11.5px;color:var(--text-3)">
+      ↑ Click any row to trace the full diagnosis across all tabs
+    </div>
+  </div>`;
+
+  // per-exception detail below the table (shown when selected)
+  const detailDiv=`<div id="exc-detail"></div>`;
+
+  el.innerHTML=alertHtml+metricsHtml+excCard+detailDiv;
+}
+
+function renderPlannerExc(exc){
+  const el=document.getElementById('exc-detail');
+
+  const alertHtml=`<div class="alert ${exc.alert.level}" style="margin-top:0">
+    <div class="alert-icon">${exc.alert.icon}</div>
+    <div><div class="alert-title">${exc.alert.title}</div><div class="alert-desc">${exc.alert.desc}</div></div>
+  </div>`;
+
+  const confPct=exc.rca.confidence;
+  const confColor=confPct>=90?'#16a34a':confPct>=80?'#d97706':'#dc2626';
+  const rcaCard=`<div class="card">
+    <div class="card-head">
+      <div class="card-title"><div class="card-icon ci-amber">⬡</div>Root cause analysis — ${exc.sku}</div>
+      <span class="pill p-gray">${exc.rca.layer}</span>
+    </div>
+    <div class="card-body">
+      <div class="rca-finding">${exc.rca.finding}</div>
+      <div class="evidence-list">${exc.rca.evidence.map(e=>`<div class="ev-item"><div class="ev-dot"></div><span>${e}</span></div>`).join('')}</div>
+      <div class="conf-row">
+        <span class="conf-lbl">Confidence</span>
+        <div class="conf-bar-bg"><div class="conf-bar-fill" style="width:${confPct}%;background:${confColor}"></div></div>
+        <span class="conf-val" style="color:${confColor}">${confPct}%</span>
+      </div>
+    </div>
+  </div>`;
+
+  const actGrid=`<div class="card">
+    <div class="card-head">
+      <div class="card-title"><div class="card-icon ci-blue">✦</div>Actions taken</div>
+      <span class="pill p-gray">${exc.actions.length} actions</span>
+    </div>
+    <div class="action-grid">${exc.actions.map(a=>`
+      <div class="action-item">
+        <div class="act-tier ${a.tierCls}">${a.tier} — ${a.tierLabel}</div>
+        <div class="act-title">${a.title}</div>
+        <div class="act-desc">${a.desc}</div>
+        <div class="act-status ${a.statusCls}">${a.status}</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+
+  el.innerHTML=`<div style="padding-top:14px">${alertHtml}<div class="two-col">${rcaCard}</div>${actGrid}</div>`;
+  el.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// ─── REASONING TAB ────────────────────────────────────────────────────────────
+function renderReasoning(exc){
+  const el=document.getElementById('reasoning-content');
+
+  const summaryBanner=`<div style="background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--r-md);padding:11px 15px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+    <div style="width:20px;height:20px;border-radius:50%;background:var(--blue-bg);color:var(--blue-mid);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">∑</div>
+    <div style="font-size:12.5px;color:var(--text-2);line-height:1.5"><strong style="color:var(--text-1)">${exc.sku}</strong> — ${exc.agentSummary}</div>
+  </div>`;
+
+  const blocks=exc.agents.map((a,i)=>{
+    const steps=a.steps.map(s=>{
+      const dotCls=s.kind==='thought'?'d-thought':s.kind==='action'?'d-action':s.kind==='obs'?'d-obs':'d-finding';
+      const kindCls=s.kind==='thought'?'k-thought':s.kind==='action'?'k-action':s.kind==='obs'?'k-obs':'k-finding';
+      const kindLabel=s.kind==='obs'?'Observation':s.kind==='finding'?'Finding':s.kind.charAt(0).toUpperCase()+s.kind.slice(1);
+      const body=s.code?`<div class="tcode">${s.code}</div>`:`<div class="ttext">${s.text}</div>`;
+      return `<div class="tstep">
+        <div class="tdot-col"><div class="tdot ${dotCls}"></div></div>
+        <div class="tcontent"><div class="tkind ${kindCls}">${kindLabel}</div>${body}</div>
+      </div>`;
+    }).join('');
+
+    return `<div class="agent-block">
+      <div class="agent-head" onclick="toggleAgent(this)">
+        <div class="agent-idx" style="background:${a.idxBg};color:${a.idxColor}">${i+1}</div>
+        <div class="agent-name">${a.name}</div>
+        <div class="agent-summary">${a.summary}</div>
+        <span class="pill ${a.resultCls}">${a.result}</span>
+        <span class="agent-chevron">▾</span>
+      </div>
+      <div class="agent-body"><div class="trace">${steps}</div></div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=summaryBanner+blocks;
+}
+
+function toggleAgent(head){
+  head.classList.toggle('open');
+  head.nextElementSibling.classList.toggle('open');
+}
+
+// ─── RAG TAB ─────────────────────────────────────────────────────────────────
+function renderRag(exc){
+  const r=exc.rag;
+  const el=document.getElementById('rag-content');
+
+  const pipeline=`<div class="pipeline-row">
+    <div class="p-stage">Pre-filter</div><span class="p-arrow">→</span>
+    <div class="p-stage">Semantic search</div><span class="p-arrow">→</span>
+    <div class="p-stage">Re-rank</div>
+  </div>`;
+
+  const funnel=`<div class="rag-funnel">
+    <div class="rf-item"><div class="rf-val">${r.stats.total.toLocaleString()}</div><div class="rf-lbl">Total chunks</div></div>
+    <div class="rf-item"><div class="rf-val">${r.stats.filtered}</div><div class="rf-lbl">After metadata filter</div></div>
+    <div class="rf-item"><div class="rf-val">${r.stats.topK}</div><div class="rf-lbl">Semantic top-k</div></div>
+    <div class="rf-item"><div class="rf-val">${r.stats.reranked}</div><div class="rf-lbl">Re-ranked final</div></div>
+  </div>`;
+
+  const queryBox=`<div class="query-box">
+    <div class="qb-label">Query sent to Qdrant</div>
+    <div class="qb-text">"${r.query}"</div>
+    <div class="qb-filters">
+      ${r.filters.map(f=>`<span class="qb-tag qt-blue">${f}</span>`).join('')}
+      <span class="qb-tag qt-gray">${r.latency}</span>
+    </div>
+  </div>`;
+
+  const chunkCards=r.chunks.map((c,i)=>{
+    const simPct=Math.round(c.sim*100);
+    const tags=c.tags.map(t=>`<span class="qb-tag qt-gray">${t}</span>`).join('');
+    return `<div class="chunk-card">
+      <div class="ck-top">
+        <div>
+          <div class="ck-source">${c.source}</div>
+          <div class="ck-id">${c.id}</div>
+        </div>
+        <div class="ck-sim">
+          <span class="sim-label">Cosine similarity</span>
+          <div class="sim-bar-bg"><div class="sim-bar-fill" style="width:${simPct}%"></div></div>
+          <span class="sim-val">${c.sim.toFixed(2)}</span>
+        </div>
+      </div>
+      <div class="ck-preview">${c.preview}</div>
+      <div class="ck-tags">${tags}<span class="qb-tag qt-blue">${c.date}</span></div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`<div class="card">
+    <div class="card-head">
+      <div class="card-title"><div class="card-icon ci-teal">◎</div>RAG pipeline — ${exc.sku}</div>
+      <span class="pill p-gray">${r.intent}</span>
+    </div>
+    <div class="card-body">${pipeline}${funnel}${queryBox}
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:8px">Retrieved chunks (top ${r.stats.reranked} after re-rank)</div>
+      ${chunkCards}
+    </div>
+  </div>`;
+}
+
+// ─── EVAL TAB ─────────────────────────────────────────────────────────────────
+function renderEval(exc){
+  const ev=exc.eval;
+  const el=document.getElementById('eval-content');
+
+  const circ=2*Math.PI*30;
+  const offset=circ*(1-ev.overall/100);
+  const ringColor=ev.overall>=90?'#16a34a':ev.overall>=80?'#d97706':'#dc2626';
+
+  const ring=`<div class="score-ring">
+    <svg width="76" height="76" viewBox="0 0 76 76">
+      <circle cx="38" cy="38" r="30" fill="none" stroke="var(--ink-100)" stroke-width="6"/>
+      <circle cx="38" cy="38" r="30" fill="none" stroke="${ringColor}" stroke-width="6"
+        stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" stroke-linecap="round"/>
+    </svg>
+    <div class="score-center">
+      <div class="score-num" style="color:${ringColor}">${ev.overall}</div>
+      <div class="score-denom">/100</div>
+    </div>
+  </div>`;
+
+  const dims=ev.dims.map(d=>{
+    const pct=Math.round(d.val*100);
+    const cls=d.cls==='pass'?'pass':d.cls==='warn'?'warn':'fail';
+    return `<div class="dim-row">
+      <span class="dim-name">${d.name}</span>
+      <div class="dim-bar-bg"><div class="dim-bar db-${cls}" style="width:${pct}%"></div></div>
+      <span class="dim-val dv-${cls}">${d.val.toFixed(2)}</span>
+    </div>`;
+  }).join('');
+
+  const heroCard=`<div class="eval-hero">
+    ${ring}
+    <div class="eval-dims">${dims}</div>
+  </div>`;
+
+  const verdictCard=`<div class="card" style="margin-bottom:14px">
+    <div class="card-head"><div class="card-title"><div class="card-icon ci-green">✓</div>Eval verdict — ${exc.sku}</div></div>
+    <div class="card-body">
+      <div class="rca-finding" style="margin-bottom:10px">${ev.verdict}</div>
+      <div style="border-top:1px solid var(--border-soft);padding-top:10px">
+        <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);margin-bottom:5px">Improvement note</div>
+        <div style="font-size:12.5px;color:var(--text-2)">${ev.improvement}</div>
+      </div>
+    </div>
+  </div>`;
+
+  const extraMetrics=`<div class="eval-grid">${ev.extraMetrics.map(m=>`
+    <div class="eval-metric">
+      <div class="em-label">${m.label}</div>
+      <div class="em-val ${m.cls}">${m.val}</div>
+      <div class="em-sub">${m.sub}</div>
+      <div class="em-note">${m.note}</div>
+    </div>`).join('')}</div>`;
+
+  el.innerHTML=heroCard+verdictCard+extraMetrics;
+}
+</script>
+</body>
+</html>

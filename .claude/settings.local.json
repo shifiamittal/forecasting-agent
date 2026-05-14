@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 *)",
+      "Bash(curl -s -X POST http://localhost:8000/api/run/HERSHEYS)",
+      "Bash(curl -s -X POST http://localhost:8000/api/run/HERSHEYS -w \"\\\\n\\\\nHTTP_STATUS:%{http_code}\\\\nTIME_TOTAL:%{time_total}\")",
+      "Bash(npm run *)",
+      "Bash(curl *)"
+    ]
+  }
+}
