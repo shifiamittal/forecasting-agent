@@ -1,0 +1,307 @@
+{
+  "cycle": {
+    "client_id": "HERSHEYS",
+    "client_name": "Hershey's",
+    "cycle_id": "HC-2024-047",
+    "skus_scanned": 2400,
+    "agents_active": "4 of 5",
+    "alert": {
+      "level": "a-red",
+      "icon": "⚠",
+      "title": "3 exceptions found in cycle HC-2024-047 — action required",
+      "desc": "Agent pipeline completed across 2,400 Hershey's SKUs. Three issues found: Kroger sales data has been missing 11 days (urgent — suppress from replenishment), seasonal model weights are stale for Q4 (retrain needed), and a Valentine's Day promo spike is expected and normal (planner review of override value). Select an exception below to trace the full diagnosis."
+    },
+    "metrics": [
+      { "label": "SKUs flagged",       "val": "23", "cls": "mv-red",   "sub": "↑18 vs last cycle",          "subCls": "sub-up" },
+      { "label": "Exceptions found",   "val": "3",  "cls": "mv-amber", "sub": "Across 3 root cause types",  "subCls": "" },
+      { "label": "Autonomous actions", "val": "3",  "cls": "mv-green", "sub": "T1 — no approval needed",    "subCls": "" },
+      { "label": "Pending approvals",  "val": "5",  "cls": "mv-blue",  "sub": "T2 items awaiting review",   "subCls": "" }
+    ]
+  },
+  "exceptions": [
+    {
+      "id": "exc-1",
+      "sku": "KIS-YORK-PEPPERMINT-12",
+      "segment": "Chocolate seasonal SKUs",
+      "sev": "HIGH", "sevCls": "p-red",
+      "type": "data_issue",
+      "tier": "T3", "tierCls": "tier-t3",
+      "diagnosis": "Kroger stopped sending sales data 11 days ago — these forecasts are based on incomplete actuals and should not be used for replenishment until fixed",
+      "alert": {
+        "level": "a-red", "icon": "⚠",
+        "title": "Do not use these forecasts — Kroger sales data has been missing for 11 days",
+        "desc": "Kroger has not sent point-of-sale data since October 17th. The forecasting model ran without 11 days of actual sales, so its output for chocolate seasonal SKUs at Kroger is unreliable. The agent has suppressed these SKUs from flowing into replenishment and created a backfill request. No action needed from you until the backfill is confirmed."
+      },
+      "rca": {
+        "finding": "<strong>The forecast for these SKUs is wrong because Kroger stopped sending sales data 11 days ago.</strong> A data pipeline job that collects Kroger point-of-sale data failed on October 17th and never recovered. The model ran its normal cycle but trained on 11 days of missing actuals — so its output is systematically biased for all 18 chocolate seasonal SKUs sold at Kroger. The fix is straightforward: manually recover the missing sales data from the Kroger vendor portal, then re-run. The agent has seen this exact failure before (incident #89, 8 months ago) — accuracy recovered within one cycle after backfill.",
+        "evidence": [
+          "Kroger data last received: 11 days ago (October 17th)",
+          "Pipeline job failure confirmed: connection timeout, no automatic recovery",
+          "18 chocolate seasonal SKUs at Kroger affected — missing 11 days of sales",
+          "This has happened before: incident #89 resolved via manual backfill, 1-cycle recovery"
+        ],
+        "confidence": 94,
+        "layer": "Data pipeline — Layer 1",
+        "confCls": "mv-green"
+      },
+      "actions": [
+        { "tier": "T1", "tierCls": "at-t1", "tierLabel": "Autonomous",          "title": "Exception queue published",  "desc": "23 exceptions ranked by severity, sent to planner UI.",                                                                              "status": "✓ Done",            "statusCls": "as-done"    },
+        { "tier": "T1", "tierCls": "at-t1", "tierLabel": "Autonomous",          "title": "3 SKUs suppressed",          "desc": "Low-confidence SKUs (quality score 0.41) suppressed from ERP downstream.",                                                             "status": "✓ Done",            "statusCls": "as-done"    },
+        { "tier": "T1", "tierCls": "at-t1", "tierLabel": "Autonomous",          "title": "Incident tagged",            "desc": "RCA logged to knowledge base with evidence. Available for future pattern matching.",                                                     "status": "✓ Done",            "statusCls": "as-done"    },
+        { "tier": "T2", "tierCls": "at-t2", "tierLabel": "Recommend + approve", "title": "Actuals backfill request",   "desc": "Manual backfill from Kroger vendor portal for 18 affected SKUs. Pre-filled, awaiting DS approval.",                                       "status": "⏳ Pending DS",      "statusCls": "as-pending" },
+        { "tier": "T2", "tierCls": "at-t2", "tierLabel": "Recommend + approve", "title": "Segment suppression",        "desc": "Suppress chocolate seasonal from downstream until backfill confirmed.",                                                                  "status": "⏳ Pending planner", "statusCls": "as-pending" },
+        { "tier": "T3", "tierCls": "at-t3", "tierLabel": "Surface only",        "title": "Engineering ticket created", "desc": "Kroger POS ingestion — connection timeout. Retry logic review + stale feed alerting at 48h threshold.",                                    "status": "🔴 For engineering", "statusCls": "as-review"  }
+      ],
+      "agentSummary": "Kroger data pipeline failure identified as the root cause. Agent stopped diagnosis at Layer 1 — no model or feature issue to investigate. Backfill request pre-filled, engineering ticket raised. Confidence 94%.",
+      "agents": [
+        {
+          "name": "Trigger Router",
+          "idxBg": "#e0f2fe", "idxColor": "#0369a1",
+          "result": "2 agents activated", "resultCls": "p-blue",
+          "summary": "Accuracy dropped + 23 SKUs flagged → activates Exception Triage and RCA Diagnostic",
+          "steps": [
+            { "kind": "thought", "text": "Reading forecast summary. Checking activation conditions for cycle HC-2024-047." },
+            { "kind": "action", "code": "check_thresholds(cycle='HC-2024-047', client='HERSHEYS')" },
+            { "kind": "obs",    "text": "23 SKUs above delta threshold (0.15). Segment chocolate_seasonal: wMAPE delta +3.6 pts (threshold: 2.0). Bias +0.21. 2 data quality flags." },
+            { "kind": "finding","text": "Activate Exception Triage (delta + data quality flags) and RCA Diagnostic (wMAPE breach). Retrain/Override not triggered yet." }
+          ]
+        },
+        {
+          "name": "RCA Diagnostic Agent",
+          "idxBg": "#fef3c7", "idxColor": "#b45309",
+          "result": "Root cause: data pipeline", "resultCls": "p-amber",
+          "summary": "Checked retailers in order — Kroger data missing 11 days. Stopped there. No model or feature investigation needed.",
+          "steps": [
+            { "kind": "thought", "text": "Layer 1: data pipeline health. Checking all Hershey's retailers in order." },
+            { "kind": "action", "code": "check_feed_freshness('WALMART', 'HERSHEYS')" },
+            { "kind": "obs",    "text": "Last successful: 2 hours ago. Fresh." },
+            { "kind": "action", "code": "check_feed_freshness('KROGER', 'HERSHEYS')" },
+            { "kind": "obs",    "text": "Last successful: 11 days ago. STALE — feed failure on [date]." },
+            { "kind": "thought","text": "Kroger stale. Checking pipeline logs to confirm root cause." },
+            { "kind": "action", "code": "check_pipeline_logs('chocolate_seasonal', 'last_14_days')" },
+            { "kind": "obs",    "text": "Argo job failure. Kroger POS ingestion: connection timeout. No retry successful. 18 chocolate seasonal SKUs affected." },
+            { "kind": "action", "code": "get_rag_context('Kroger feed failure chocolate seasonal prior incidents', 'HERSHEYS')" },
+            { "kind": "obs",    "text": "Prior incident #89 (8 months ago): same pattern. Resolution: manual actuals backfill from Kroger portal. wMAPE recovered within 1 cycle." },
+            { "kind": "finding","text": "Root cause confirmed at Layer 1 — data pipeline. Confidence 0.94. Known pattern with documented fix. Layers 2–3 not needed." }
+          ]
+        },
+        {
+          "name": "Eval Agent",
+          "idxBg": "#dcfce7", "idxColor": "#15803d",
+          "result": "Score 91/100", "resultCls": "p-green",
+          "summary": "All three eval dimensions above threshold. No human review required. Incident logged.",
+          "steps": [
+            { "kind": "action", "code": "score_faithfulness(rca_output, evidence_list)" },
+            { "kind": "obs",    "text": "0.94 — all claims supported by evidence. Kroger staleness confirmed by pipeline logs. Prior incident cited as direct precedent." },
+            { "kind": "action", "code": "score_layer_sequence(rca_output)" },
+            { "kind": "obs",    "text": "1.0 — Layer 1 checked first, stopped correctly at root cause. Layer 4 confirmed in parallel. Correct sequence." },
+            { "kind": "action", "code": "score_tier_classification(tier_actions)" },
+            { "kind": "obs",    "text": "0.90 — all tier classifications correct. Reversible actions (queue publish, suppression) → T1. Backfill request → T2. Engineering ticket → T3." },
+            { "kind": "finding","text": "Overall score 91/100. No action required. Incident logged to knowledge base." }
+          ]
+        }
+      ],
+      "rag": {
+        "query": "Kroger feed failure chocolate seasonal Hersheys prior incidents",
+        "intent": "data_issue resolution precedent",
+        "filters": ["client_id: HERSHEYS", "source_type: incident_record, pipeline_log"],
+        "stats": { "total": 15000, "filtered": 340, "topK": 20, "reranked": 3 },
+        "latency": "312ms",
+        "chunks": [
+          { "source": "Incident Record",      "id": "INC-089 / chunk_1", "sim": 0.91, "preview": "Kroger POS feed failure — connection timeout. Argo job retry logic failed silently. Resolution path: manual actuals backfill from Kroger vendor portal, confirmed within 18 hours. wMAPE recovered within 1 cycle post-backfill.",                                                                           "tags": ["HERSHEYS", "data_issue", "kroger"],        "date": "2024-02-14" },
+          { "source": "Override History",     "id": "OVR-031 / chunk_2", "sim": 0.84, "preview": "Post INC-089: override applied to chocolate seasonal for 2 weeks. wMAPE recovered from 14.8 → 11.3 within cycle 48. Override expired per schedule with no accuracy degradation.",                                                                                                                           "tags": ["HERSHEYS", "override", "chocolate_seasonal"], "date": "2024-02-28" },
+          { "source": "Data Readiness Report","id": "RR-047 / chunk_3",  "sim": 0.77, "preview": "Validation post-backfill: Kroger actuals restored. Schema validation APPROVED. Temporal integrity APPROVED. Feature readiness CONDITIONAL — seasonal weights require Q4 refresh.",                                                                                                                           "tags": ["HERSHEYS", "readiness", "kroger"],         "date": "2024-03-01" }
+        ]
+      },
+      "eval": {
+        "overall": 91,
+        "dims": [
+          { "name": "Diagnostic faithfulness",    "val": 0.94, "cls": "pass" },
+          { "name": "Layer sequence compliance",  "val": 1.0,  "cls": "pass" },
+          { "name": "Tier classification accuracy","val": 0.90, "cls": "pass" }
+        ],
+        "verdict": "All dimensions above threshold. No human review required. Root cause correctly stopped at Layer 1. Incident logged to knowledge base for future retrieval.",
+        "improvement": "Recommendation: add a Kroger feed staleness alert at the 48-hour mark to the Data Readiness Agent. Current pattern: degradation accumulates for 11 days before detection.",
+        "extraMetrics": [
+          { "label": "Evidence utilization rate",      "val": "3 / 3",   "cls": "mv-green", "sub": "All retrieved chunks cited in reasoning",          "note": "High utilization — knowledge base had directly relevant incident records. When this is low, it signals the knowledge base lacks content for the field being queried." },
+          { "label": "Field-level grounding failures", "val": "0 / 23",  "cls": "mv-green", "sub": "No undescribed fields in diagnosis path",           "note": "0% of diagnostic failures involved undescribed catalog fields. When this is high (>60%), it indicates the catalog is missing descriptions for fields the agent relies on." },
+          { "label": "Retrieval cosine similarity",    "val": "0.84 avg","cls": "mv-green", "sub": "Top chunk similarity to query vector",              "note": "0.91 / 0.84 / 0.77 across 3 chunks. High first-chunk similarity confirms the knowledge base had strong coverage for this known failure pattern." }
+        ]
+      }
+    },
+
+    {
+      "id": "exc-2",
+      "sku": "KIS-REESE-SEASONAL-GROUP",
+      "segment": "Chocolate seasonal SKUs",
+      "sev": "HIGH", "sevCls": "p-red",
+      "type": "feature_drift",
+      "tier": "T2", "tierCls": "tier-t2",
+      "diagnosis": "Model is systematically underforecasting Q4 holiday demand — seasonal uplift weights haven't been refreshed since June and are missing the Q4 pattern entirely",
+      "alert": {
+        "level": "a-amber", "icon": "⚡",
+        "title": "Model is underforecasting holiday demand — seasonal weights are 4 months out of date",
+        "desc": "The forecasting model for Hershey's chocolate seasonal SKUs was last updated in June. It is missing the Q4 holiday uplift pattern — the higher baseline demand that every year precedes Halloween, Thanksgiving, and Christmas. The model doesn't know Q4 is different, so it's underforecasting. The fix is a model retrain with refreshed seasonal weights, not a one-off override. This problem will get worse each cycle until the retrain runs."
+      },
+      "rca": {
+        "finding": "<strong>The model is underforecasting because its seasonal demand patterns are 4 months stale.</strong> All data pipelines are healthy — Walmart, Target, Kroger, and Costco feeds are all current. The problem is inside the model itself: the seasonal uplift weights that tell it 'Q4 demand is higher than the rest of the year' were last calculated in June and never refreshed for the holiday period. The model is flying blind on the most important sales quarter of the year. Forecast bias has worsened every cycle for 4 straight cycles (+0.09 → +0.14 → +0.19 → +0.24) — a pattern that cannot be fixed by a simple correction. A model retrain with updated seasonal weights is the only resolution. The same problem occurred last year (incident #031) and a retrain recovered accuracy within 2 cycles.",
+        "evidence": [
+          "All retailer data feeds confirmed current — data pipeline is not the issue",
+          "Seasonal uplift weights last refreshed: June 2024 (4 months ago)",
+          "Q4 uplift pattern missing from model — the model treats October–December like any other quarter",
+          "Forecast bias worsening every cycle for 4 straight cycles: +0.09 → +0.14 → +0.19 → +0.24",
+          "Prior incident #031 (same cause, last year): retrain with seasonal recalibration restored accuracy in 2 cycles"
+        ],
+        "confidence": 89,
+        "layer": "Feature drift — Layer 2",
+        "confCls": "mv-amber"
+      },
+      "actions": [
+        { "tier": "T1", "tierCls": "at-t1", "tierLabel": "Autonomous",          "title": "Incident tagged",                    "desc": "Seasonal weight staleness RCA logged to knowledge base. Linked to prior incident #031 for pattern matching in future cycles.",                              "status": "✓ Done",            "statusCls": "as-done"    },
+        { "tier": "T2", "tierCls": "at-t2", "tierLabel": "Recommend + approve", "title": "Retrain request pre-filled",          "desc": "hersheys_autogluon_v12 · 18-month window · seasonal weight recalibration required. Queued for DS approval. Est. runtime 6–8h.",                         "status": "⏳ Pending DS",      "statusCls": "as-pending" },
+        { "tier": "T2", "tierCls": "at-t2", "tierLabel": "Recommend + approve", "title": "Interim override suggested",          "desc": "While retrain is running, apply +18% scalar override to chocolate seasonal SKUs for the next 2 cycles. Based on prior year Q4 uplift baseline.",      "status": "⏳ Pending planner", "statusCls": "as-pending" },
+        { "tier": "T3", "tierCls": "at-t3", "tierLabel": "Surface only",        "title": "PM flag: seasonal refresh schedule",  "desc": "Seasonal weights have no automated refresh schedule. Recommend adding an August refresh checkpoint to the Data Readiness Agent to catch this before Q4 every year.", "status": "🔴 For PM review",   "statusCls": "as-review"  }
+      ],
+      "agentSummary": "Data pipelines all clean. Model feature inspection found seasonal uplift weights 4 months stale — Q4 holiday pattern missing. Bias worsening 4 cycles straight. Retrain required, interim override pre-filled. Confidence 89%.",
+      "agents": [
+        {
+          "name": "RCA Diagnostic Agent",
+          "idxBg": "#fef3c7", "idxColor": "#b45309",
+          "result": "Root cause: feature drift", "resultCls": "p-amber",
+          "summary": "All feeds fresh → checked model features → seasonal weights last updated June, Q4 uplift pattern absent",
+          "steps": [
+            { "kind": "thought", "text": "Layer 1: checking data pipeline health. Need to rule out a data problem before looking at the model." },
+            { "kind": "action", "code": "check_feed_freshness('ALL_RETAILERS', 'HERSHEYS')" },
+            { "kind": "obs",    "text": "Walmart: 2h ago. Target: 3h ago. Kroger: 4h ago. Costco: 2h ago. All feeds current. No pipeline failures." },
+            { "kind": "thought","text": "Layer 1 clean — data is not the problem. Proceeding to Layer 2: checking model input features for drift." },
+            { "kind": "action", "code": "check_feature_drift('hsy_ssnl_uplift_wt', 'chocolate_seasonal', current, prior_q4)" },
+            { "kind": "obs",    "text": "Seasonal uplift weight drift score: 0.84 (threshold: 0.50). Weights last refreshed: June 2024. Q4 uplift coefficient is absent from current model — it was not captured in the June training window." },
+            { "kind": "action", "code": "get_rag_context('Hersheys seasonal weight staleness Q4 uplift prior incidents', 'HERSHEYS')" },
+            { "kind": "obs",    "text": "Prior incident #031 (11 months ago): same root cause — seasonal weights missed August refresh. Resolution: retrain with seasonal recalibration + interim override. Accuracy recovered in 2 cycles." },
+            { "kind": "finding","text": "Root cause at Layer 2 — seasonal feature staleness. Q4 uplift pattern missing from model weights. Structural degradation across 4 cycles. Override alone is insufficient. Retrain required. Confidence 0.89." }
+          ]
+        },
+        {
+          "name": "Retrain / Override Agent",
+          "idxBg": "#ede9fe", "idxColor": "#7c3aed",
+          "result": "Retrain + interim override", "resultCls": "p-violet",
+          "summary": "4-cycle worsening trend across 30% of SKU scope → override alone ruled out. Retrain config pre-filled. Interim override for coverage while retrain runs.",
+          "steps": [
+            { "kind": "action", "code": "get_degradation_history('chocolate_seasonal_group', n_cycles=4)" },
+            { "kind": "obs",    "text": "wMAPE: 11.2 → 12.1 → 13.4 → 14.8. Bias: +0.09 → +0.14 → +0.19 → +0.24. Monotonically worsening. Affects 30% of Hershey's SKU scope." },
+            { "kind": "thought","text": "Degradation is broad (30%) and sustained (4 cycles, worsening). A scalar override cannot fix missing Q4 uplift weights across 30% of SKUs — the model fundamentally does not know Q4 demand is higher. Retrain required. But retrain takes 6–8 hours, so an interim override bridges the gap." },
+            { "kind": "action", "code": "get_rag_context('Hersheys seasonal retrain prior config accuracy lift', 'HERSHEYS')" },
+            { "kind": "obs",    "text": "Prior retrain INC-031 (same driver): 18-month window, seasonal recalibration. wMAPE improvement: 2.4 pts within 2 cycles. Interim override of +18% applied during retrain window." },
+            { "kind": "finding","text": "Recommendation: RETRAIN (primary) + INTERIM OVERRIDE (bridge). Retrain: 18-month window, seasonal weight recalibration. Override: +18% scalar on chocolate seasonal for 2 cycles. Expected improvement: 2.0–2.5 wMAPE pts. Both pre-filled for approval." }
+          ]
+        }
+      ],
+      "rag": {
+        "query": "Hersheys seasonal uplift weight staleness Q4 holiday chocolate retrain prior decision",
+        "intent": "feature drift — seasonal weight recalibration precedent",
+        "filters": ["client_id: HERSHEYS", "source_type: incident_record, retrain_decision, eval_log"],
+        "stats": { "total": 15000, "filtered": 260, "topK": 20, "reranked": 3 },
+        "latency": "298ms",
+        "chunks": [
+          { "source": "Incident Record", "id": "INC-031 / chunk_1",      "sim": 0.93, "preview": "Seasonal model weights missed August refresh — Q4 uplift coefficient absent from training window. Root cause: no automated refresh schedule. Resolution: retrain with 18-month window + seasonal recalibration. Interim +18% override applied during retrain. Accuracy recovered in 2 cycles.",                                   "tags": ["HERSHEYS", "feature_drift", "seasonal"], "date": "2023-11-14" },
+          { "source": "Retrain Record",  "id": "RT-HSY-2023 / chunk_2",  "sim": 0.87, "preview": "Retrain triggered: seasonal weight staleness. Training window: 18 months. Seasonal uplift recalibrated against 3 prior Q4 periods. Post-retrain wMAPE improvement: 2.4 pts within 2 cycles. Bias resolved by cycle 3.",                                                                                                     "tags": ["HERSHEYS", "retrain", "seasonal"],       "date": "2023-11-21" },
+          { "source": "Model Eval Log",  "id": "EVAL-HC-044 / chunk_3",  "sim": 0.81, "preview": "Chocolate seasonal wMAPE trend: 4-cycle monotonic increase. Seasonal coefficient weight shows highest feature importance for Q4 SKUs. Feature drift score 0.84 confirms Q4 uplift pattern missing from current model.",                                                                                                      "tags": ["HERSHEYS", "eval", "chocolate_seasonal"],"date": "2024-10-25" }
+        ]
+      },
+      "eval": {
+        "overall": 89,
+        "dims": [
+          { "name": "Diagnostic faithfulness",    "val": 0.92, "cls": "pass" },
+          { "name": "Layer sequence compliance",  "val": 1.0,  "cls": "pass" },
+          { "name": "Tier classification accuracy","val": 0.85, "cls": "warn" }
+        ],
+        "verdict": "Faithfulness and sequence compliance above threshold. Tier classification flagged — the PM seasonal refresh alert was placed at T3 (surface only) but given this is a recurring annual failure, T2 (recommend + approve with a scheduled fix) may be more appropriate.",
+        "improvement": "This is the second consecutive year this exact failure has occurred (INC-031 last year, now this cycle). The recurring pattern suggests the fix is not just a retrain but adding an automated August seasonal weight refresh check to the Data Readiness Agent — so the problem is caught before Q4 begins, not after 4 cycles of degradation.",
+        "extraMetrics": [
+          { "label": "Evidence utilization rate",      "val": "3 / 3",   "cls": "mv-green", "sub": "All retrieved chunks cited in reasoning",          "note": "All 3 chunks contributed: INC-031 confirmed known pattern, retrain record provided config precedent, eval log confirmed feature importance ranking. High utilization reflects strong knowledge base coverage for this failure type." },
+          { "label": "Field-level grounding failures", "val": "0 / 6",   "cls": "mv-green", "sub": "No undescribed fields in diagnosis path",           "note": "hsy_ssnl_uplift_wt is documented in the catalog with an LLM interpretability note explaining the Q4 uplift multiplier. The agent correctly identified drift and interpreted the coefficient absence — grounding prevented a misdiagnosis as a data issue." },
+          { "label": "Retrieval cosine similarity",    "val": "0.87 avg","cls": "mv-green", "sub": "Top chunk similarity to query vector",              "note": "0.93 / 0.87 / 0.81 across 3 chunks. Strong first-chunk match confirms the knowledge base has well-indexed seasonal failure records. The 0.81 eval log chunk is still above the 0.75 retrieval confidence threshold." }
+        ]
+      }
+    },
+
+    {
+      "id": "exc-3",
+      "sku": "KIS-KISSES-BULK-24",
+      "segment": "Chocolate seasonal SKUs",
+      "sev": "MED", "sevCls": "p-amber",
+      "type": "demand_signal",
+      "tier": "T2", "tierCls": "tier-t2",
+      "diagnosis": "Forecast spike is expected — Valentine's Day promo is driving +22% uplift, in line with last year. Review the override value.",
+      "alert": {
+        "level": "a-green", "icon": "✓",
+        "title": "Nothing is wrong — this spike is the Valentine's Day promotion",
+        "desc": "The +22% forecast increase on chocolate seasonal SKUs is exactly what should be happening. The Valentine's Day promotion is registered for week 6, and last year's uplift for the same event was +18–24%. The forecast is working correctly. What the planner needs to do: review the pre-filled override value (+20%, based on last year's midpoint) and confirm it before the promotion window opens. Separate note: the model has been slightly underforecasting this segment for 2 cycles — flagged for DS to monitor."
+      },
+      "rca": {
+        "finding": "<strong>The forecast spike is correct — this is a Valentine's Day promotion, not a model error.</strong> The +22% delta on chocolate seasonal SKUs is fully explained by the Valentine's Day promotion registered in the trade calendar for week 6. Last year's uplift for the same promotion was +18–24%, which brackets this year's +22% exactly. Nothing is broken. However, there is a separate secondary concern: the model has produced a small positive bias for 2 straight cycles (+0.09 → +0.18 → +0.21) that is independent of the promo. This won't cause an immediate problem but suggests the model may be slightly miscalibrated on this segment — worth a DS check before it compounds.",
+        "evidence": [
+          "Valentine's Day promotion registered in trade calendar for week 6 (Feb 12–18)",
+          "Last year's chocolate seasonal uplift for the same event: +18–24%",
+          "This year's delta +22% — within last year's range, as expected",
+          "Data quality score: 0.83 — all feeds current, no pipeline issues",
+          "Separate: model bias has trended positive 3 cycles in a row (+0.09 → +0.18 → +0.21)"
+        ],
+        "confidence": 87,
+        "layer": "External signal — Layer 4",
+        "confCls": "mv-green"
+      },
+      "actions": [
+        { "tier": "T1", "tierCls": "at-t1", "tierLabel": "Autonomous",          "title": "Exception queue published", "desc": "Promo context and prior year comparison sent to planner UI automatically.",                                              "status": "✓ Done",            "statusCls": "as-done"    },
+        { "tier": "T2", "tierCls": "at-t2", "tierLabel": "Recommend + approve", "title": "Override review suggested", "desc": "Pre-filled override: +20% scalar on chocolate seasonal (prior year midpoint). Awaiting planner review.",               "status": "⏳ Pending planner", "statusCls": "as-pending" },
+        { "tier": "T2", "tierCls": "at-t2", "tierLabel": "Recommend + approve", "title": "DS bias flag queued",       "desc": "Secondary: persistent positive bias over 2 cycles. DS review recommended for model recalibration assessment.",           "status": "⏳ Pending DS",      "statusCls": "as-pending" }
+      ],
+      "agentSummary": "Trade calendar confirmed Valentine's Day promo explains the +22% spike — this is expected demand, not a model problem. Override value pre-filled for planner review. Small ongoing bias concern routed to DS separately.",
+      "agents": [
+        {
+          "name": "Exception Triage Agent",
+          "idxBg": "#fee2e2", "idxColor": "#dc2626",
+          "result": "Demand signal", "resultCls": "p-blue",
+          "summary": "Found trade calendar match — Valentine's Day promo explains the spike. No investigation needed. Override review queued for planner.",
+          "steps": [
+            { "kind": "action", "code": "get_forecast_delta('choc_seasonal_group', 'ALL', 'HC-2024-047')" },
+            { "kind": "obs",    "text": "Average delta +22% vs prior cycle across 18 SKUs. Range: +14% to +31%." },
+            { "kind": "action", "code": "get_data_quality_score('choc_seasonal_group', 'HC-2024-047')" },
+            { "kind": "obs",    "text": "Data quality score: 0.83. Above threshold. No feed flags." },
+            { "kind": "action", "code": "get_rag_context('chocolate seasonal Valentine Day promo week 6 Hersheys', 'HERSHEYS')" },
+            { "kind": "obs",    "text": "Trade calendar: Valentine's Day promo week 6. Prior year chocolate seasonal uplift: +18–24%." },
+            { "kind": "thought","text": "+22% delta is within the prior year promo range. This is demand_signal, not model_issue. But bias trending positive 2 cycles is a separate secondary concern." },
+            { "kind": "finding","text": "Exception: demand_signal. Severity 4.74 → Tier 2. Promo override review for planner. Bias concern routed to DS separately." }
+          ]
+        }
+      ],
+      "rag": {
+        "query": "chocolate seasonal Valentine Day promo week 6 Hersheys prior year uplift",
+        "intent": "demand signal verification — promo context",
+        "filters": ["client_id: HERSHEYS", "source_type: reference_doc, override_history"],
+        "stats": { "total": 15000, "filtered": 180, "topK": 20, "reranked": 3 },
+        "latency": "241ms",
+        "chunks": [
+          { "source": "Trade Calendar",  "id": "CAL-2024-W06 / chunk_1",  "sim": 0.95, "preview": "Valentine's Day promotional window: Week 6 (Feb 12–18 2024). Retailer scope: Walmart, Target, Kroger. SKU scope: all chocolate seasonal. Historical uplift range: +18–24% vs baseline demand.",                                                                                                        "tags": ["HERSHEYS", "promo", "chocolate_seasonal"], "date": "2024-01-15" },
+          { "source": "Override History","id": "OVR-2023-VD / chunk_2",   "sim": 0.88, "preview": "Valentine's Day 2023: +21% scalar override applied to chocolate seasonal. Outcome: forecast within 3% of actual. Override expired week 7. No accuracy degradation post-expiry.",                                                                                                                         "tags": ["HERSHEYS", "override", "valentine"],       "date": "2023-02-20" },
+          { "source": "Model Eval Log",  "id": "EVAL-HC-033 / chunk_3",   "sim": 0.74, "preview": "Cycle 33 (Valentine's 2023): chocolate seasonal wMAPE 8.9 — below annual average 11.2. Promo override contributed to accuracy improvement. Model correctly normalized post-promo.",                                                                                                                    "tags": ["HERSHEYS", "eval", "seasonal"],            "date": "2023-02-28" }
+        ]
+      },
+      "eval": {
+        "overall": 87,
+        "dims": [
+          { "name": "Diagnostic faithfulness",    "val": 0.90, "cls": "pass" },
+          { "name": "Layer sequence compliance",  "val": 1.0,  "cls": "pass" },
+          { "name": "Tier classification accuracy","val": 0.90, "cls": "pass" }
+        ],
+        "verdict": "All dimensions above threshold. Demand signal correctly identified — the agent retrieved the trade calendar entry and matched it against prior year uplift before classifying. Bias concern correctly separated from the promo classification and sent to DS rather than bundled into the same action.",
+        "improvement": "The model has now produced positive bias for 3 straight cycles on this segment. The current rules activate RCA Diagnostic only when wMAPE crosses a threshold — but a persistent bias trend below that threshold is also meaningful. Consider adding a 3-cycle bias trend rule to the Trigger Router so it catches slow-building model miscalibration before it becomes a larger accuracy problem.",
+        "extraMetrics": [
+          { "label": "Evidence utilization rate",      "val": "3 / 3",   "cls": "mv-green", "sub": "Trade calendar, override history, eval log all cited",  "note": "All 3 retrieved chunks contributed to the diagnosis — trade calendar confirmed promo, prior override confirmed expected delta, eval log confirmed post-promo normalization pattern." },
+          { "label": "Field-level grounding failures", "val": "0 / 4",   "cls": "mv-green", "sub": "No undescribed fields in reasoning path",               "note": "wape_delta and demand_signal fields both have catalog descriptions with LLM interpretability notes. Agent correctly applied threshold (0.15) and compared to prior year range." },
+          { "label": "Retrieval cosine similarity",    "val": "0.86 avg","cls": "mv-green", "sub": "Top chunk similarity to query vector",                   "note": "0.95 / 0.88 / 0.74 across 3 chunks. Strong top-chunk match (trade calendar). Third chunk (eval log) lower similarity — still useful for historical context." }
+        ]
+      }
+    }
+  ]
+}

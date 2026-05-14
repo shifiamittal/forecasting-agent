@@ -1,0 +1,303 @@
+{
+  "cycle": {
+    "client_id": "CORNING",
+    "client_name": "Corning",
+    "cycle_id": "CRN-2024-047",
+    "skus_scanned": 850,
+    "agents_active": "4 of 5",
+    "alert": {
+      "level": "a-red",
+      "icon": "⚠",
+      "title": "3 exceptions found in cycle CRN-2024-047 — action required",
+      "desc": "Agent pipeline completed across 850 Corning SKUs. Three issues found: Grainger distributor feed has been missing 8 days (urgent — suppress industrial SKUs from replenishment), OEM display glass model is underforecasting due to Samsung order baseline shift (retrain needed), and an end-of-year capital equipment buying spike is expected and normal (planner review of override value). Select an exception below to trace the full diagnosis."
+    },
+    "metrics": [
+      { "label": "SKUs flagged",       "val": "240", "cls": "mv-red",   "sub": "↑190 vs last cycle",         "subCls": "sub-up" },
+      { "label": "Exceptions found",   "val": "3",   "cls": "mv-amber", "sub": "Across 3 root cause types",  "subCls": "" },
+      { "label": "Autonomous actions", "val": "2",   "cls": "mv-green", "sub": "T1 — no approval needed",    "subCls": "" },
+      { "label": "Pending approvals",  "val": "4",   "cls": "mv-blue",  "sub": "T2 items awaiting review",   "subCls": "" }
+    ]
+  },
+  "exceptions": [
+    {
+      "id": "exc-1",
+      "sku": "CRN-INDUS-FEED-01",
+      "segment": "Industrial SKUs",
+      "sev": "HIGH", "sevCls": "p-red",
+      "type": "data_issue",
+      "tier": "T3", "tierCls": "tier-t3",
+      "diagnosis": "Distributor feed from Grainger has been missing for 8 days — 14 industrial SKUs have incomplete actuals and forecasts should not be used for replenishment",
+      "alert": {
+        "level": "a-red", "icon": "⚠",
+        "title": "Do not use these forecasts — Grainger distributor data has been missing for 8 days",
+        "desc": "Grainger has not sent distributor sales data since October 19th. The forecasting model ran without 8 days of actual sales, so its output for industrial SKUs sourced through Grainger is unreliable. The agent has suppressed these 14 SKUs from flowing into replenishment and queued a backfill request for DS approval. No action needed from you until the backfill is confirmed."
+      },
+      "rca": {
+        "finding": "<strong>The forecast for these SKUs is wrong because the Grainger distributor feed has been missing for 8 days.</strong> An Argo ingestion job that collects Grainger distributor sales data failed on October 19th with a connection timeout and never recovered. The model ran its normal cycle but trained on 8 days of missing actuals — its output for all 14 affected industrial SKUs is unreliable. The agent has seen this exact failure pattern before (incident INC-041, 6 months ago) — recovery was achieved within one cycle after a manual backfill from the Grainger data portal.",
+        "evidence": [
+          "Grainger distributor feed last received: 8 days ago (October 19th)",
+          "Pipeline job failure confirmed: Argo ingestion connection timeout, no automatic recovery",
+          "14 industrial SKUs at Grainger affected — missing 8 days of actual sales",
+          "Prior incident INC-041 (6 months ago): same pattern, resolved via manual backfill, 1-cycle recovery"
+        ],
+        "confidence": 91,
+        "layer": "Data pipeline — Layer 1",
+        "confCls": "mv-green"
+      },
+      "actions": [
+        { "tier": "T1", "tierCls": "at-t1", "tierLabel": "Autonomous",          "title": "14 SKUs suppressed from downstream", "desc": "Affected industrial SKUs suppressed from ERP replenishment flow until backfill is confirmed.",                                                               "status": "✓ Done",            "statusCls": "as-done"    },
+        { "tier": "T2", "tierCls": "at-t2", "tierLabel": "Recommend + approve", "title": "Backfill request queued",             "desc": "Manual backfill from Grainger data portal for 14 affected SKUs. Pre-filled, awaiting DS approval.",                                                         "status": "⏳ Pending DS",      "statusCls": "as-pending" },
+        { "tier": "T3", "tierCls": "at-t3", "tierLabel": "Surface only",        "title": "Engineering ticket raised",           "desc": "Grainger distributor feed — Argo connection timeout. Retry logic review + automated stale feed alerting at 48h threshold recommended.",                    "status": "🔴 For engineering", "statusCls": "as-review"  }
+      ],
+      "agentSummary": "Grainger distributor feed missing 8 days — 14 industrial SKUs have incomplete actuals. Argo ingestion job failure confirmed, same pattern as prior incident INC-041. SKUs suppressed, backfill request queued. Engineering ticket raised. Confidence 91%.",
+      "agents": [
+        {
+          "name": "Trigger Router",
+          "idxBg": "#e0f2fe", "idxColor": "#0369a1",
+          "result": "2 agents activated", "resultCls": "p-blue",
+          "summary": "Data quality flags on 14 SKUs + wMAPE breach on industrial segment → activates Exception Triage and RCA Diagnostic",
+          "steps": [
+            { "kind": "thought", "text": "Reading forecast summary for CRN-2024-047. Checking activation conditions." },
+            { "kind": "action",  "code": "check_thresholds(cycle='CRN-2024-047', client='CORNING')" },
+            { "kind": "obs",     "text": "240 SKUs above delta threshold. Industrial SKU group: wMAPE delta +4.1 pts (threshold: 2.0). Data quality flags on 14 SKUs. Feed freshness issue detected." },
+            { "kind": "finding", "text": "Activate Exception Triage (data quality flags + delta) and RCA Diagnostic (wMAPE breach). Retrain/Override not triggered yet." }
+          ]
+        },
+        {
+          "name": "RCA Diagnostic Agent",
+          "idxBg": "#fef3c7", "idxColor": "#b45309",
+          "result": "Root cause: data pipeline", "resultCls": "p-amber",
+          "summary": "Grainger feed stale 8 days — Argo ingestion timeout confirmed. Stopped at Layer 1. No feature or model investigation needed.",
+          "steps": [
+            { "kind": "thought", "text": "Layer 1: data pipeline health. Checking Corning distributor and retailer feeds in order." },
+            { "kind": "action",  "code": "check_feed_freshness('DIRECT_B2B', 'CORNING')" },
+            { "kind": "obs",     "text": "Last successful: 1 hour ago. Fresh." },
+            { "kind": "action",  "code": "check_feed_freshness('GRAINGER', 'CORNING')" },
+            { "kind": "obs",     "text": "Last successful: 8 days ago. STALE — feed failure on October 19th." },
+            { "kind": "thought", "text": "Grainger stale. Checking pipeline logs to confirm root cause." },
+            { "kind": "action",  "code": "check_pipeline_logs('industrial_sku_group', 'last_14_days')" },
+            { "kind": "obs",     "text": "Argo job failure. Grainger distributor feed ingestion: connection timeout. No retry successful. 14 industrial SKUs missing 8 days of actuals." },
+            { "kind": "action",  "code": "get_rag_context('Grainger feed failure industrial SKUs Corning prior incidents', 'CORNING')" },
+            { "kind": "obs",     "text": "Prior incident INC-041 (6 months ago): same pattern — Argo connection timeout on Grainger feed. Resolution: manual backfill from Grainger data portal. wMAPE recovered within 1 cycle." },
+            { "kind": "finding", "text": "Root cause confirmed at Layer 1 — data pipeline. Confidence 0.91. Known failure pattern with documented resolution. Layers 2–4 not needed." }
+          ]
+        },
+        {
+          "name": "Eval Agent",
+          "idxBg": "#dcfce7", "idxColor": "#15803d",
+          "result": "Score 91/100", "resultCls": "p-green",
+          "summary": "All three eval dimensions above threshold. No human review required. Incident logged.",
+          "steps": [
+            { "kind": "action",  "code": "score_faithfulness(rca_output, evidence_list)" },
+            { "kind": "obs",     "text": "0.91 — all claims supported by Grainger feed logs and prior incident INC-041. Connection timeout confirmed by pipeline logs." },
+            { "kind": "action",  "code": "score_layer_sequence(rca_output)" },
+            { "kind": "obs",     "text": "1.0 — Layer 1 checked first, stopped correctly at root cause. Correct sequential diagnosis." },
+            { "kind": "action",  "code": "score_tier_classification(tier_actions)" },
+            { "kind": "obs",     "text": "0.89 — SKU suppression correctly T1 (reversible, autonomous). Backfill request correctly T2 (requires DS approval). Engineering ticket correctly T3." },
+            { "kind": "finding", "text": "Overall score 91/100. No action required. Incident logged to knowledge base." }
+          ]
+        }
+      ],
+      "rag": {
+        "query": "Grainger feed failure industrial SKUs Corning prior incidents",
+        "intent": "data_issue resolution precedent",
+        "filters": ["client_id: CORNING", "source_type: incident_record, pipeline_log"],
+        "stats": { "total": 15000, "filtered": 210, "topK": 20, "reranked": 3 },
+        "latency": "288ms",
+        "chunks": [
+          { "source": "Incident Record",      "id": "INC-041 / chunk_1", "sim": 0.89, "preview": "Grainger distributor feed failure — Argo ingestion connection timeout. Feed stale 9 days before detection. Resolution: manual actuals backfill from Grainger data portal, confirmed within 24 hours. wMAPE recovered within 1 cycle post-backfill.",                                            "tags": ["CORNING", "data_issue", "grainger"],       "date": "2024-04-11" },
+          { "source": "Pipeline Log",         "id": "PL-CRN-031 / chunk_2","sim": 0.82, "preview": "Argo job: corning_grainger_ingest. Status: FAILED. Error: connection timeout after 3 retries. Slack alert not triggered — alert threshold set to 72h. Recommendation: lower alert threshold to 48h for distributor feeds.",                                                                    "tags": ["CORNING", "pipeline", "grainger"],         "date": "2024-04-09" },
+          { "source": "Data Readiness Report","id": "RR-CRN-039 / chunk_3","sim": 0.74, "preview": "Post-backfill validation CRN-cycle-38: Grainger actuals restored. Schema validation APPROVED. Temporal integrity APPROVED. Industrial SKU group returned to normal replenishment flow. Recommended: add Grainger feed freshness check to daily readiness report.",                               "tags": ["CORNING", "readiness", "industrial"],      "date": "2024-04-14" }
+        ]
+      },
+      "eval": {
+        "overall": 91,
+        "dims": [
+          { "name": "Diagnostic faithfulness",    "val": 0.91, "cls": "pass" },
+          { "name": "Layer sequence compliance",  "val": 1.0,  "cls": "pass" },
+          { "name": "Tier classification accuracy","val": 0.89, "cls": "pass" }
+        ],
+        "verdict": "All dimensions above threshold. Root cause correctly stopped at Layer 1. Known failure pattern with well-documented resolution path — knowledge base retrieval was highly effective. Incident logged.",
+        "improvement": "The Grainger feed was stale for 8 days before detection. Pipeline alert threshold is currently set to 72 hours. Lowering to 48 hours would cut the exposure window roughly in half and bring it in line with the Kroger feed alerting recommendation from the prior incident.",
+        "extraMetrics": [
+          { "label": "Evidence utilization rate",      "val": "3 / 3",   "cls": "mv-green", "sub": "All retrieved chunks cited in reasoning",     "note": "INC-041 confirmed the prior pattern, pipeline log confirmed the failure mode, readiness report confirmed the recovery path. High utilization reflects strong knowledge base coverage for distributor feed failures." },
+          { "label": "Field-level grounding failures", "val": "0 / 14",  "cls": "mv-green", "sub": "No undescribed fields in diagnosis path",      "note": "All 14 affected SKUs had complete catalog descriptions. Feed freshness and data quality fields are both documented with LLM interpretability notes." },
+          { "label": "Retrieval cosine similarity",    "val": "0.82 avg","cls": "mv-green", "sub": "Top chunk similarity to query vector",         "note": "0.89 / 0.82 / 0.74 across 3 chunks. Strong first-chunk match confirms prior incident INC-041 is well-indexed in the knowledge base." }
+        ]
+      }
+    },
+
+    {
+      "id": "exc-2",
+      "sku": "CRN-OEM-SAMSUNG-GROUP",
+      "segment": "OEM display glass SKUs",
+      "sev": "HIGH", "sevCls": "p-red",
+      "type": "feature_drift",
+      "tier": "T2", "tierCls": "tier-t2",
+      "diagnosis": "Model is underforecasting OEM orders because Samsung reduced orders 3 months ago and the model has not been retrained to reflect the new baseline",
+      "alert": {
+        "level": "a-amber", "icon": "⚡",
+        "title": "Model is underforecasting OEM display glass — Samsung order baseline has shifted and the model hasn't caught up",
+        "desc": "Samsung reduced its display glass orders 3 months ago, establishing a lower order baseline. The forecasting model was last retrained 14 months ago and does not reflect this shift — it continues to forecast against the higher pre-reduction baseline, producing systematic overforecasts. The bias has been worsening for 3 straight cycles. The fix requires a model retrain with refreshed ACV distribution data — a one-off override will not resolve the structural misalignment."
+      },
+      "rca": {
+        "finding": "<strong>The model is overforecasting OEM display glass because Samsung reduced orders 3 months ago and the model hasn't been retrained to reflect the new baseline.</strong> All data feeds are healthy — direct B2B and OEM distributor feeds are current with no pipeline failures. The problem is the ACV (all commodity volume) weighted distribution used to calibrate OEM order expectations: its drift score is 0.81 against a 0.50 threshold, reflecting Samsung's order reduction 3 months ago. The model was last trained 14 months ago and treats Samsung's current lower order volume as an anomaly rather than a structural shift. Bias has worsened every cycle for 3 straight cycles (+0.12 → +0.17 → +0.23). A prior incident 14 months ago had the same driver — a retrain with refreshed ACV data improved wMAPE by 2.1 points within 2 cycles.",
+        "evidence": [
+          "All distributor and OEM feeds confirmed current — data pipeline is not the issue",
+          "ACV weighted distribution drift score: 0.81 (threshold: 0.50)",
+          "Samsung order reduction 3 months ago — new lower baseline not reflected in model training data",
+          "Model last trained 14 months ago — predates the Samsung order shift",
+          "Forecast bias worsening 3 consecutive cycles: +0.12 → +0.17 → +0.23",
+          "Prior incident INC-028 (14 months ago, same driver): retrain with ACV refresh improved wMAPE 2.1 pts in 2 cycles"
+        ],
+        "confidence": 87,
+        "layer": "Feature drift — Layer 2",
+        "confCls": "mv-amber"
+      },
+      "actions": [
+        { "tier": "T2", "tierCls": "at-t2", "tierLabel": "Recommend + approve", "title": "Retrain request pre-filled",          "desc": "corning_autogluon_v13 · 12-month window · ACV distribution recalibration required. Queued for DS approval. Est. runtime 4–6h.",                             "status": "⏳ Pending DS",      "statusCls": "as-pending" },
+        { "tier": "T2", "tierCls": "at-t2", "tierLabel": "Recommend + approve", "title": "Interim override suggested",          "desc": "While retrain is running, apply an interim correction to OEM Samsung group for the next 2 cycles. Pre-filled based on 3-month order baseline shift.",      "status": "⏳ Pending planner", "statusCls": "as-pending" },
+        { "tier": "T3", "tierCls": "at-t3", "tierLabel": "Surface only",        "title": "PM flag: automated ACV refresh",      "desc": "ACV distribution has no automated refresh schedule. Recommend quarterly ACV recalibration trigger tied to major OEM account review cadence.",               "status": "🔴 For PM review",   "statusCls": "as-review"  }
+      ],
+      "agentSummary": "All data feeds clean. ACV distribution drift score 0.81 detected at Layer 2 — model underforecasting OEM orders because Samsung reduced orders 3 months ago and the model has not been retrained to reflect the new baseline. Bias worsening 3 cycles. Retrain request pre-filled, interim override suggested. Confidence 87%.",
+      "agents": [
+        {
+          "name": "RCA Diagnostic Agent",
+          "idxBg": "#fef3c7", "idxColor": "#b45309",
+          "result": "Root cause: feature drift", "resultCls": "p-amber",
+          "summary": "All feeds clean → ACV distribution drift 0.81 at Layer 2 — Samsung order reduction not reflected in model weights",
+          "steps": [
+            { "kind": "thought", "text": "Layer 1: checking data pipeline health for OEM display glass segment." },
+            { "kind": "action",  "code": "check_feed_freshness('ALL_DISTRIBUTORS', 'CORNING')" },
+            { "kind": "obs",     "text": "Direct B2B: 1h ago. OEM distributor feeds: all current. No pipeline failures. Data quality scores all above 0.88." },
+            { "kind": "thought", "text": "Layer 1 clean — data is not the problem. Proceeding to Layer 2: checking model input features for drift." },
+            { "kind": "action",  "code": "check_feature_drift('acv_weighted_distribution', 'oem_samsung_group', current, prior_6m)" },
+            { "kind": "obs",     "text": "ACV weighted distribution drift score: 0.81 (threshold: 0.50). Samsung order volume reduced 3 months ago — new lower baseline not captured in model. Last trained 14 months ago." },
+            { "kind": "action",  "code": "get_rag_context('Corning OEM display glass ACV drift Samsung order baseline retrain prior decision', 'CORNING')" },
+            { "kind": "obs",     "text": "Prior incident INC-028 (14 months ago): ACV distribution shift from major OEM customer. Resolution: retrain with 12-month window + ACV recalibration. wMAPE improvement: 2.1 pts within 2 cycles." },
+            { "kind": "finding", "text": "Root cause at Layer 2 — ACV distribution feature drift. Samsung order reduction structural, not transient. Retrain required. Confidence 0.87." }
+          ]
+        },
+        {
+          "name": "Retrain / Override Agent",
+          "idxBg": "#ede9fe", "idxColor": "#7c3aed",
+          "result": "Retrain + interim override", "resultCls": "p-violet",
+          "summary": "3-cycle worsening bias across OEM Samsung group → override alone ruled out. Retrain config pre-filled. Interim correction while retrain runs.",
+          "steps": [
+            { "kind": "action",  "code": "get_degradation_history('oem_samsung_group', n_cycles=3)" },
+            { "kind": "obs",     "text": "Bias: +0.12 → +0.17 → +0.23. wMAPE: 8.9 → 10.4 → 12.1. Monotonically worsening over 3 cycles." },
+            { "kind": "thought", "text": "Sustained 3-cycle degradation across OEM Samsung group. A scalar override cannot fix a structural ACV distribution misalignment — the model is calibrating against the wrong order baseline. Retrain required. Interim override bridges the gap." },
+            { "kind": "action",  "code": "get_rag_context('Corning OEM retrain ACV distribution refresh prior accuracy lift', 'CORNING')" },
+            { "kind": "obs",     "text": "Prior retrain INC-028 (same driver): 12-month window, ACV distribution recalibration. wMAPE improvement: 2.1 pts within 2 cycles. Interim correction applied during retrain window." },
+            { "kind": "finding", "text": "Recommendation: RETRAIN (primary) + INTERIM OVERRIDE (bridge). Retrain: 12-month window, ACV distribution recalibration. Expected improvement: 2.0–2.3 wMAPE pts. Both pre-filled for approval." }
+          ]
+        }
+      ],
+      "rag": {
+        "query": "Corning OEM display glass ACV distribution drift Samsung order baseline retrain prior decision",
+        "intent": "feature drift — ACV distribution recalibration precedent",
+        "filters": ["client_id: CORNING", "source_type: incident_record, retrain_decision, eval_log"],
+        "stats": { "total": 15000, "filtered": 195, "topK": 20, "reranked": 3 },
+        "latency": "276ms",
+        "chunks": [
+          { "source": "Incident Record", "id": "INC-028 / chunk_1",      "sim": 0.91, "preview": "OEM display glass ACV distribution shift — major OEM customer reduced order volume. Model trained 14 months prior, predating the shift. Resolution: retrain with 12-month window + ACV recalibration. wMAPE improvement: 2.1 pts within 2 cycles. Interim correction applied during retrain.",               "tags": ["CORNING", "feature_drift", "oem"],    "date": "2023-08-14" },
+          { "source": "Retrain Record",  "id": "RT-CRN-2023 / chunk_2",  "sim": 0.85, "preview": "Retrain triggered: ACV distribution feature drift. Training window: 12 months. ACV weighted distribution recalibrated against updated OEM order baselines. Post-retrain wMAPE improvement: 2.1 pts within 2 cycles. Bias resolved by cycle 3.",                                                            "tags": ["CORNING", "retrain", "oem"],          "date": "2023-08-21" },
+          { "source": "Model Eval Log",  "id": "EVAL-CRN-041 / chunk_3", "sim": 0.78, "preview": "OEM Samsung group wMAPE trend: 3-cycle monotonic increase. ACV weighted distribution shows highest feature importance for OEM SKUs. Drift score 0.81 confirms Samsung order baseline not reflected in current model weights.",                                                                            "tags": ["CORNING", "eval", "oem_samsung"],     "date": "2024-10-24" }
+        ]
+      },
+      "eval": {
+        "overall": 89,
+        "dims": [
+          { "name": "Diagnostic faithfulness",    "val": 0.92, "cls": "pass" },
+          { "name": "Layer sequence compliance",  "val": 1.0,  "cls": "pass" },
+          { "name": "Tier classification accuracy","val": 0.87, "cls": "warn" }
+        ],
+        "verdict": "Faithfulness and sequence compliance above threshold. Tier classification flagged — the PM flag for automated ACV refresh was placed at T3 (surface only) but given this is the second occurrence of the same root cause, T2 (recommend + approve with a scheduled fix) would be more appropriate.",
+        "improvement": "This is the second occurrence of ACV distribution drift causing model misalignment (INC-028 last year). An automated quarterly ACV recalibration trigger tied to major OEM account reviews would prevent this pattern from recurring. The knowledge base now has two strong precedents for this failure type, which should improve detection confidence in future cycles.",
+        "extraMetrics": [
+          { "label": "Evidence utilization rate",      "val": "3 / 3",   "cls": "mv-green", "sub": "All retrieved chunks cited in reasoning",     "note": "INC-028 confirmed the pattern, retrain record provided the config template, eval log confirmed feature importance ranking. Strong knowledge base coverage for OEM drift failures." },
+          { "label": "Field-level grounding failures", "val": "0 / 8",   "cls": "mv-green", "sub": "No undescribed fields in diagnosis path",      "note": "acv_weighted_distribution is documented in the catalog with an interpretability note explaining the OEM order calibration multiplier. Grounding prevented misclassification as a data issue." },
+          { "label": "Retrieval cosine similarity",    "val": "0.85 avg","cls": "mv-green", "sub": "Top chunk similarity to query vector",         "note": "0.91 / 0.85 / 0.78 across 3 chunks. Strong first-chunk match confirms the prior incident is well-indexed. Third chunk still above 0.75 retrieval confidence threshold." }
+        ]
+      }
+    },
+
+    {
+      "id": "exc-3",
+      "sku": "CRN-DISPLAY-SEASONAL",
+      "segment": "Display glass seasonal SKUs",
+      "sev": "MED", "sevCls": "p-amber",
+      "type": "demand_signal",
+      "tier": "T2", "tierCls": "tier-t2",
+      "diagnosis": "Forecast spike is expected — end-of-year capital equipment buying cycle is driving a +18% uplift consistent with prior year pattern. Planner should review override value.",
+      "alert": {
+        "level": "a-green", "icon": "✓",
+        "title": "Nothing is wrong — this spike is the end-of-year capital equipment buying cycle",
+        "desc": "The +18% forecast increase on display glass seasonal SKUs is consistent with the annual end-of-year capital equipment purchasing pattern. Corning's enterprise and data center customers accelerate display glass orders in Q4 to exhaust capital budgets before year-end. Last year's uplift for the same window was +15–22%. The forecast is working correctly. What the planner needs to do: review the pre-filled override value (+17%, based on last year's midpoint) and confirm it."
+      },
+      "rca": {
+        "finding": "<strong>The forecast spike is correct — this is the annual end-of-year capital equipment buying cycle, not a model error.</strong> The +18% delta on display glass seasonal SKUs is fully explained by Corning's enterprise and data center customers accelerating purchases in Q4 to exhaust year-end capital budgets. This pattern occurs every year and is registered in the trade calendar. Last year's uplift for the same window was +15–22%, which brackets this year's +18% exactly. All data feeds are clean. Nothing is broken.",
+        "evidence": [
+          "End-of-year capital equipment buying cycle registered in trade calendar for Q4 (Oct–Dec)",
+          "Last year's display glass seasonal uplift for the same window: +15–22%",
+          "This year's delta +18% — within last year's range, as expected",
+          "Data quality score: 0.91 — all feeds current, no pipeline issues",
+          "Customer purchasing pattern consistent with prior 3 years of Q4 uplift"
+        ],
+        "confidence": 88,
+        "layer": "External signal — Layer 4",
+        "confCls": "mv-green"
+      },
+      "actions": [
+        { "tier": "T1", "tierCls": "at-t1", "tierLabel": "Autonomous",          "title": "Exception queue published", "desc": "Q4 capital equipment buying context and prior year comparison sent to planner UI automatically.",                                                   "status": "✓ Done",            "statusCls": "as-done"    },
+        { "tier": "T2", "tierCls": "at-t2", "tierLabel": "Recommend + approve", "title": "Override review pre-filled at +17%", "desc": "Pre-filled override: +17% scalar on display glass seasonal (prior year midpoint). Awaiting planner review and confirmation.",              "status": "⏳ Pending planner", "statusCls": "as-pending" }
+      ],
+      "agentSummary": "End-of-year capital equipment buying cycle explains the +18% spike — trade calendar match confirmed with prior year pattern +15–22%. Override review pre-filled at +17%. Confidence 88%.",
+      "agents": [
+        {
+          "name": "Exception Triage Agent",
+          "idxBg": "#fee2e2", "idxColor": "#dc2626",
+          "result": "Demand signal", "resultCls": "p-blue",
+          "summary": "Trade calendar match found — Q4 capital equipment buying cycle explains the spike. Override review pre-filled at +17% for planner.",
+          "steps": [
+            { "kind": "action",  "code": "get_forecast_delta('display_glass_seasonal', 'ALL', 'CRN-2024-047')" },
+            { "kind": "obs",     "text": "Average delta +18% vs prior cycle across display glass seasonal SKUs. Range: +12% to +24%." },
+            { "kind": "action",  "code": "get_data_quality_score('display_glass_seasonal', 'CRN-2024-047')" },
+            { "kind": "obs",     "text": "Data quality score: 0.91. All feeds current. No pipeline flags." },
+            { "kind": "action",  "code": "get_rag_context('Corning display glass seasonal Q4 capital equipment buying cycle prior year', 'CORNING')" },
+            { "kind": "obs",     "text": "Trade calendar: Q4 end-of-year capital equipment purchasing window. Prior year Corning display glass seasonal uplift for same window: +15–22%. Pattern consistent for 3 prior years." },
+            { "kind": "thought", "text": "+18% delta is within the prior year Q4 range. Data is clean. This is demand_signal, not a model or data problem." },
+            { "kind": "finding", "text": "Exception: demand_signal. Severity medium → Tier 2. Override review at +17% pre-filled for planner confirmation." }
+          ]
+        }
+      ],
+      "rag": {
+        "query": "Corning display glass seasonal Q4 capital equipment buying cycle prior year uplift",
+        "intent": "demand signal verification — Q4 buying cycle context",
+        "filters": ["client_id: CORNING", "source_type: reference_doc, override_history, trade_calendar"],
+        "stats": { "total": 15000, "filtered": 155, "topK": 20, "reranked": 3 },
+        "latency": "231ms",
+        "chunks": [
+          { "source": "Trade Calendar",  "id": "CAL-2024-Q4 / chunk_1",     "sim": 0.94, "preview": "Q4 end-of-year capital equipment buying window: October–December 2024. Customer scope: enterprise data center, semiconductor OEM. SKU scope: display glass seasonal. Historical uplift range: +15–22% vs Q3 baseline.",                                                                              "tags": ["CORNING", "trade_calendar", "Q4"],       "date": "2024-09-01" },
+          { "source": "Override History","id": "OVR-CRN-2023-Q4 / chunk_2", "sim": 0.86, "preview": "Q4 2023 capital equipment buying cycle: +16% scalar override applied to display glass seasonal. Outcome: forecast within 4% of actual across the window. Override expired end of December with no accuracy degradation in Q1.",                                                                       "tags": ["CORNING", "override", "display_seasonal"],"date": "2023-12-08" },
+          { "source": "Model Eval Log",  "id": "EVAL-CRN-038 / chunk_3",    "sim": 0.71, "preview": "CRN cycle 38 (Q4 2023): display glass seasonal wMAPE 7.2 — below annual average 9.1. Q4 override contributed to accuracy improvement. Model correctly normalized in Q1 post-window expiry.",                                                                                                    "tags": ["CORNING", "eval", "display_seasonal"],   "date": "2023-12-22" }
+        ]
+      },
+      "eval": {
+        "overall": 88,
+        "dims": [
+          { "name": "Diagnostic faithfulness",    "val": 0.90, "cls": "pass" },
+          { "name": "Layer sequence compliance",  "val": 1.0,  "cls": "pass" },
+          { "name": "Tier classification accuracy","val": 0.88, "cls": "pass" }
+        ],
+        "verdict": "All dimensions above threshold. Demand signal correctly identified — the agent retrieved the Q4 trade calendar entry and matched it against prior year uplift before classifying. Override pre-filled at the prior year midpoint is appropriate.",
+        "improvement": "The Q4 capital equipment buying pattern has been consistent for 3 straight years. Consider adding an automated pre-cycle alert to the Trigger Router for Q4 cycles that flags expected uplift for display glass seasonal SKUs, reducing the triage workload for a predictable and recurring demand pattern.",
+        "extraMetrics": [
+          { "label": "Evidence utilization rate",      "val": "3 / 3",   "cls": "mv-green", "sub": "Trade calendar, override history, eval log all cited", "note": "All 3 chunks contributed: trade calendar confirmed the seasonal pattern, prior override confirmed the expected delta, eval log confirmed Q4 normalization pattern." },
+          { "label": "Field-level grounding failures", "val": "0 / 5",   "cls": "mv-green", "sub": "No undescribed fields in reasoning path",               "note": "demand_signal and seasonal_uplift fields both documented with LLM interpretability notes. Agent correctly compared delta to prior year range before classifying." },
+          { "label": "Retrieval cosine similarity",    "val": "0.84 avg","cls": "mv-green", "sub": "Top chunk similarity to query vector",                   "note": "0.94 / 0.86 / 0.71 across 3 chunks. Strong first-chunk match (trade calendar). Third chunk slightly lower — still useful for historical Q4 normalization context." }
+        ]
+      }
+    }
+  ]
+}

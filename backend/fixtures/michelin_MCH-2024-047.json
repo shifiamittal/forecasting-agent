@@ -1,0 +1,301 @@
+{
+  "cycle": {
+    "client_id": "MICHELIN",
+    "client_name": "Michelin",
+    "cycle_id": "MCH-2024-047",
+    "skus_scanned": 1120,
+    "agents_active": "4 of 5",
+    "alert": {
+      "level": "a-red",
+      "icon": "⚠",
+      "title": "3 exceptions found in cycle MCH-2024-047 — action required",
+      "desc": "Agent pipeline completed across 1,120 Michelin SKUs. Three issues found: Q4 fleet replacement demand has been pulled forward 3 weeks by major logistics customers (planner should confirm override timing), commercial truck tire model is underforecasting because fleet age distribution data is 5 months stale (retrain needed), and Carrefour France stopped sending POS data 6 days ago (urgent — suppress French retail SKUs from replenishment). Select an exception below to trace the full diagnosis."
+    },
+    "metrics": [
+      { "label": "SKUs flagged",       "val": "156", "cls": "mv-red",   "sub": "↑112 vs last cycle",         "subCls": "sub-up" },
+      { "label": "Exceptions found",   "val": "3",   "cls": "mv-amber", "sub": "Across 3 root cause types",  "subCls": "" },
+      { "label": "Autonomous actions", "val": "2",   "cls": "mv-green", "sub": "T1 — no approval needed",    "subCls": "" },
+      { "label": "Pending approvals",  "val": "4",   "cls": "mv-blue",  "sub": "T2 items awaiting review",   "subCls": "" }
+    ]
+  },
+  "exceptions": [
+    {
+      "id": "exc-1",
+      "sku": "MCH-FLEET-REPLACE-Q4",
+      "segment": "Fleet replacement tire SKUs",
+      "sev": "MED", "sevCls": "p-amber",
+      "type": "demand_signal",
+      "tier": "T2", "tierCls": "tier-t2",
+      "diagnosis": "Forecast spike is expected — major logistics customers moved their Q4 fleet replacement purchasing window 3 weeks earlier this year. The +25% delta is a demand signal, not a model failure. Planner should confirm override timing.",
+      "alert": {
+        "level": "a-green", "icon": "✓",
+        "title": "Nothing is wrong — Q4 fleet replacement purchasing has been pulled forward 3 weeks",
+        "desc": "The +25% forecast increase on fleet replacement tire SKUs is demand-driven: major logistics customers (DHL, FedEx, XPO) have moved their Q4 fleet tire replacement window 3 weeks earlier than last year. The forecast model correctly detected the demand signal. Prior year Q4 uplift for the same customer group was +20–28%, which brackets this year's +25%. What the planner needs to do: review the pre-filled override and confirm the timing shift is reflected in the replenishment schedule."
+      },
+      "rca": {
+        "finding": "<strong>The forecast spike is correct — this is Q4 fleet replacement demand pulled forward 3 weeks, not a model failure.</strong> The +25% delta on fleet replacement tire SKUs is fully explained by a timing shift in Q4 fleet purchasing: three major logistics customers (DHL, FedEx, XPO) moved their annual fleet tire replacement window 3 weeks earlier this year. Customer purchasing signals confirmed from all three accounts. Prior year Q4 uplift for the same group was +20–28%, which brackets this year's +25% exactly. All data feeds are clean. Nothing is broken — but the planner should confirm the override timing accounts for the 3-week pull-forward so replenishment aligns with the earlier delivery window.",
+        "evidence": [
+          "Q4 fleet replacement purchasing window moved 3 weeks earlier — confirmed from 3 fleet accounts (DHL, FedEx, XPO)",
+          "Prior year Q4 fleet replacement uplift: +20–28% — this year's +25% is within range",
+          "Customer purchasing signals confirmed independently from 3 accounts",
+          "Data quality score: 0.94 — all feeds current, no pipeline issues",
+          "Trade calendar entry registered: Q4 fleet replacement window, logistics sector"
+        ],
+        "confidence": 85,
+        "layer": "External signal — Layer 4",
+        "confCls": "mv-green"
+      },
+      "actions": [
+        { "tier": "T1", "tierCls": "at-t1", "tierLabel": "Autonomous",          "title": "Exception queue published",   "desc": "Fleet account purchasing signals and prior year Q4 comparison sent to planner UI automatically.",                                                       "status": "✓ Done",            "statusCls": "as-done"    },
+        { "tier": "T2", "tierCls": "at-t2", "tierLabel": "Recommend + approve", "title": "Override timing review",      "desc": "Pre-filled override: +24% scalar on fleet replacement SKUs, timed to the earlier purchasing window. Awaiting planner review and schedule confirmation.", "status": "⏳ Pending planner", "statusCls": "as-pending" }
+      ],
+      "agentSummary": "Q4 fleet replacement purchasing window moved 3 weeks earlier — +25% delta is a demand signal, confirmed from 3 fleet accounts. Trade calendar match found with prior year pattern +20–28%. Planner override timing review queued. Confidence 85%.",
+      "agents": [
+        {
+          "name": "Exception Triage Agent",
+          "idxBg": "#fee2e2", "idxColor": "#dc2626",
+          "result": "Demand signal", "resultCls": "p-blue",
+          "summary": "Fleet account purchasing signals confirmed Q4 pull-forward — prior year range brackets current delta. Override timing pre-filled for planner.",
+          "steps": [
+            { "kind": "action",  "code": "get_forecast_delta('fleet_replacement_tires', 'ALL', 'MCH-2024-047')" },
+            { "kind": "obs",     "text": "Average delta +25% vs prior cycle across fleet replacement tire SKUs. Range: +19% to +31%." },
+            { "kind": "action",  "code": "get_data_quality_score('fleet_replacement_tires', 'MCH-2024-047')" },
+            { "kind": "obs",     "text": "Data quality score: 0.94. All feeds current. No pipeline flags." },
+            { "kind": "action",  "code": "get_rag_context('Michelin fleet replacement Q4 purchasing window logistics customers prior year', 'MICHELIN')" },
+            { "kind": "obs",     "text": "Customer purchasing signals confirmed from DHL, FedEx, XPO — Q4 fleet replacement window moved 3 weeks earlier. Trade calendar registered. Prior year Q4 uplift: +20–28%." },
+            { "kind": "thought", "text": "+25% delta within prior year range. Customer signals confirmed independently from 3 accounts. This is demand_signal — purchasing pull-forward, not a model failure." },
+            { "kind": "finding", "text": "Exception: demand_signal. Severity medium → Tier 2. Override pre-filled at +24% with timing adjustment for the 3-week pull-forward. Planner confirmation needed." }
+          ]
+        }
+      ],
+      "rag": {
+        "query": "Michelin fleet replacement Q4 purchasing window logistics customers prior year uplift",
+        "intent": "demand signal verification — Q4 fleet purchasing pull-forward",
+        "filters": ["client_id: MICHELIN", "source_type: trade_calendar, customer_signal, override_history"],
+        "stats": { "total": 15000, "filtered": 168, "topK": 20, "reranked": 3 },
+        "latency": "247ms",
+        "chunks": [
+          { "source": "Trade Calendar",  "id": "CAL-2024-Q4F / chunk_1",    "sim": 0.92, "preview": "Q4 fleet tire replacement window: registered for major logistics accounts. Customer scope: DHL, FedEx, XPO. Historical uplift: +20–28% vs Q3 baseline. Note: 2024 window moved 3 weeks earlier per fleet account notifications received October 2024.",                                                   "tags": ["MICHELIN", "trade_calendar", "fleet_Q4"],  "date": "2024-10-01" },
+          { "source": "Override History","id": "OVR-MCH-2023-Q4 / chunk_2", "sim": 0.86, "preview": "Q4 2023 fleet replacement: +22% override applied to fleet replacement tire SKUs. Outcome: forecast within 5% of actual across the window. Override expired end-Q4 with no accuracy degradation in Q1 2024.",                                                                                            "tags": ["MICHELIN", "override", "fleet_replacement"],"date": "2023-12-15" },
+          { "source": "Customer Signal", "id": "CS-FLEET-Q4 / chunk_3",     "sim": 0.79, "preview": "Fleet account purchasing signal confirmed (Oct 2024): DHL, FedEx, XPO all shifted Q4 tire procurement 3 weeks earlier. Combined order volume consistent with prior year Q4 total — timing shift only, not volume change.",                                                                              "tags": ["MICHELIN", "customer_signal", "logistics"], "date": "2024-10-18" }
+        ]
+      },
+      "eval": {
+        "overall": 87,
+        "dims": [
+          { "name": "Diagnostic faithfulness",    "val": 0.91, "cls": "pass" },
+          { "name": "Layer sequence compliance",  "val": 1.0,  "cls": "pass" },
+          { "name": "Tier classification accuracy","val": 0.85, "cls": "warn" }
+        ],
+        "verdict": "Faithfulness and sequence compliance above threshold. Tier classification flagged — demand signal was correctly identified, but the timing dimension of the override (3-week pull-forward) adds complexity that warrants a T2 action with a specific timing instruction rather than a generic scalar override.",
+        "improvement": "The Q4 fleet replacement pull-forward is now confirmed from 3 fleet accounts. Consider updating the trade calendar with an automated intake from fleet account purchasing notifications — this signal arrived in October but is currently captured manually. An automated intake would allow the Trigger Router to pre-classify this as demand_signal before the cycle runs.",
+        "extraMetrics": [
+          { "label": "Evidence utilization rate",      "val": "3 / 3",   "cls": "mv-green", "sub": "Trade calendar, override history, customer signal all cited", "note": "All 3 chunks contributed: trade calendar confirmed the pattern, prior override confirmed the expected delta, customer signal confirmed the timing shift. High utilization despite the timing complexity." },
+          { "label": "Field-level grounding failures", "val": "0 / 5",   "cls": "mv-green", "sub": "No undescribed fields in reasoning path",                       "note": "demand_signal and fleet_replacement_window fields both documented with LLM interpretability notes. Agent correctly applied prior year range comparison before classifying." },
+          { "label": "Retrieval cosine similarity",    "val": "0.86 avg","cls": "mv-green", "sub": "Top chunk similarity to query vector",                           "note": "0.92 / 0.86 / 0.79 across 3 chunks. Strong matches across all three — customer signal chunk (0.79) still above 0.75 retrieval confidence threshold." }
+        ]
+      }
+    },
+
+    {
+      "id": "exc-2",
+      "sku": "MCH-TRUCK-SEASONAL-GROUP",
+      "segment": "Commercial truck tire SKUs",
+      "sev": "HIGH", "sevCls": "p-red",
+      "type": "feature_drift",
+      "tier": "T2", "tierCls": "tier-t2",
+      "diagnosis": "Model is underforecasting because fleet age distribution data — which drives replacement cycle timing — has not been refreshed in 5 months. Bias worsening 3 cycles in a row.",
+      "alert": {
+        "level": "a-amber", "icon": "⚡",
+        "title": "Model is underforecasting commercial truck tires — fleet age distribution data is 5 months stale",
+        "desc": "The forecasting model for commercial truck tire SKUs uses fleet age distribution data to predict replacement cycle timing. That data has not been refreshed in 5 months and no longer reflects the current fleet composition — an aging fleet is driving higher near-term replacement demand than the model anticipates. Forecast bias has worsened for 3 straight cycles. The fix requires a model retrain with refreshed fleet age data, not a one-off override."
+      },
+      "rca": {
+        "finding": "<strong>The model is underforecasting commercial truck tires because fleet age distribution data has not been refreshed in 5 months.</strong> All data pipelines are healthy — direct B2B and distributor feeds are current with no failures. The problem is the fleet age distribution input that drives replacement cycle timing predictions: its drift score is 0.78 against a 0.50 threshold, reflecting 5 months of fleet aging without a data refresh. As the truck fleet ages, near-term replacement demand increases — but the model is forecasting against a 5-month-old baseline. Bias has worsened every cycle for 3 straight cycles (+0.13 → +0.19 → +0.24). A prior incident 18 months ago had the same driver — a retrain with refreshed fleet data improved wMAPE by 1.9 points within 2 cycles.",
+        "evidence": [
+          "All distributor and B2B feeds confirmed current — data pipeline is not the issue",
+          "Fleet age distribution drift score: 0.78 (threshold: 0.50)",
+          "Fleet age data last refreshed: 5 months ago — current fleet composition not reflected in model",
+          "Aging fleet composition increases near-term replacement demand — model forecasting against stale baseline",
+          "Forecast bias worsening 3 consecutive cycles: +0.13 → +0.19 → +0.24",
+          "Prior incident INC-MCH-019 (18 months ago, same driver): retrain with fleet data refresh improved wMAPE 1.9 pts in 2 cycles"
+        ],
+        "confidence": 86,
+        "layer": "Feature drift — Layer 2",
+        "confCls": "mv-amber"
+      },
+      "actions": [
+        { "tier": "T2", "tierCls": "at-t2", "tierLabel": "Recommend + approve", "title": "Retrain request pre-filled",               "desc": "michelin_autogluon_v09 · 18-month window · fleet age distribution refresh required. Queued for DS approval. Est. runtime 5–7h.",                                  "status": "⏳ Pending DS",      "statusCls": "as-pending" },
+        { "tier": "T2", "tierCls": "at-t2", "tierLabel": "Recommend + approve", "title": "Interim override +15% suggested",          "desc": "While retrain is running, apply +15% scalar override to commercial truck tire SKUs for the next 2 cycles. Based on bias trend and prior retrain uplift.",        "status": "⏳ Pending planner", "statusCls": "as-pending" },
+        { "tier": "T3", "tierCls": "at-t3", "tierLabel": "Surface only",        "title": "PM flag: automated fleet data refresh",    "desc": "Fleet age distribution has no automated refresh schedule. Recommend quarterly refresh tied to fleet data provider update cadence.",                               "status": "🔴 For PM review",   "statusCls": "as-review"  }
+      ],
+      "agentSummary": "Fleet age distribution data 5 months stale — model underforecasting commercial truck tires because replacement cycle timing data hasn't been refreshed. Bias worsening 3 cycles. Retrain request pre-filled, interim override +15% queued for approval. Confidence 86%.",
+      "agents": [
+        {
+          "name": "RCA Diagnostic Agent",
+          "idxBg": "#fef3c7", "idxColor": "#b45309",
+          "result": "Root cause: feature drift", "resultCls": "p-amber",
+          "summary": "All feeds clean → fleet age distribution drift 0.78 at Layer 2 — 5-month-old fleet composition data not captured in model",
+          "steps": [
+            { "kind": "thought", "text": "Layer 1: checking data pipeline health for commercial truck tire segment." },
+            { "kind": "action",  "code": "check_feed_freshness('ALL_SOURCES', 'MICHELIN')" },
+            { "kind": "obs",     "text": "Direct B2B: 2h ago. Distributor feeds: all current. No pipeline failures. Data quality scores all above 0.88." },
+            { "kind": "thought", "text": "Layer 1 clean — data is not the problem. Proceeding to Layer 2: checking model input features for drift." },
+            { "kind": "action",  "code": "check_feature_drift('fleet_age_distribution', 'commercial_truck_group', current, prior_6m)" },
+            { "kind": "obs",     "text": "Fleet age distribution drift score: 0.78 (threshold: 0.50). Data last refreshed 5 months ago. Current fleet is aging — near-term replacement demand is increasing but model forecasts against a stale baseline." },
+            { "kind": "action",  "code": "get_rag_context('Michelin commercial truck tire fleet age distribution staleness retrain prior decision', 'MICHELIN')" },
+            { "kind": "obs",     "text": "Prior incident INC-MCH-019 (18 months ago): fleet age distribution data refresh resolved same drift pattern. wMAPE improvement 1.9 pts within 2 cycles. Interim override +12% applied during retrain." },
+            { "kind": "finding", "text": "Root cause at Layer 2 — fleet age distribution feature drift. 5-month stale baseline understating near-term replacement demand. Retrain required. Confidence 0.86." }
+          ]
+        },
+        {
+          "name": "Retrain / Override Agent",
+          "idxBg": "#ede9fe", "idxColor": "#7c3aed",
+          "result": "Retrain + interim override", "resultCls": "p-violet",
+          "summary": "3-cycle worsening bias across commercial truck group → override alone ruled out. Retrain with fleet age data refresh pre-filled. +15% interim override while retrain runs.",
+          "steps": [
+            { "kind": "action",  "code": "get_degradation_history('commercial_truck_group', n_cycles=3)" },
+            { "kind": "obs",     "text": "Bias: +0.13 → +0.19 → +0.24. wMAPE: 9.8 → 11.2 → 13.1. Monotonically worsening over 3 cycles." },
+            { "kind": "thought", "text": "Sustained 3-cycle bias degradation. A scalar override cannot fix a structural fleet age distribution misalignment — the model underestimates near-term replacement demand systematically. Retrain required. +15% interim override bridges the gap." },
+            { "kind": "action",  "code": "get_rag_context('Michelin truck tier retrain fleet age distribution refresh prior accuracy lift', 'MICHELIN')" },
+            { "kind": "obs",     "text": "Prior retrain INC-MCH-019 (same driver): 18-month window, fleet age data refresh. wMAPE improvement: 1.9 pts within 2 cycles. Interim override +12% applied during retrain window." },
+            { "kind": "finding", "text": "Recommendation: RETRAIN (primary) + INTERIM OVERRIDE (bridge). Retrain: 18-month window, fleet age distribution refresh. Override: +15% scalar for 2 cycles. Expected improvement: 1.8–2.1 wMAPE pts." }
+          ]
+        }
+      ],
+      "rag": {
+        "query": "Michelin commercial truck tire fleet age distribution staleness retrain prior decision",
+        "intent": "feature drift — fleet age distribution recalibration precedent",
+        "filters": ["client_id: MICHELIN", "source_type: incident_record, retrain_decision, eval_log"],
+        "stats": { "total": 15000, "filtered": 182, "topK": 20, "reranked": 3 },
+        "latency": "264ms",
+        "chunks": [
+          { "source": "Incident Record", "id": "INC-MCH-019 / chunk_1",  "sim": 0.90, "preview": "Commercial truck tire fleet age distribution drift — data provider refresh missed scheduled update. Model trained 14 months prior, fleet aging not reflected. Resolution: retrain with 18-month window + fleet age distribution refresh. wMAPE improvement: 1.9 pts within 2 cycles.",                          "tags": ["MICHELIN", "feature_drift", "truck_tires"],"date": "2023-04-17" },
+          { "source": "Retrain Record",  "id": "RT-MCH-2023 / chunk_2",  "sim": 0.84, "preview": "Retrain triggered: fleet age distribution staleness. Training window: 18 months. Fleet age distribution recalibrated against refreshed fleet composition data. Post-retrain wMAPE improvement: 1.9 pts within 2 cycles. Bias resolved by cycle 3.",                                                           "tags": ["MICHELIN", "retrain", "commercial_truck"], "date": "2023-04-25" },
+          { "source": "Model Eval Log",  "id": "EVAL-MCH-044 / chunk_3", "sim": 0.77, "preview": "Commercial truck group wMAPE trend: 3-cycle monotonic increase. Fleet age distribution shows highest feature importance for commercial tire replacement timing. Drift score 0.78 confirms 5-month-old fleet data is understating near-term demand.",                                                            "tags": ["MICHELIN", "eval", "commercial_truck"],    "date": "2024-10-23" }
+        ]
+      },
+      "eval": {
+        "overall": 88,
+        "dims": [
+          { "name": "Diagnostic faithfulness",    "val": 0.92, "cls": "pass" },
+          { "name": "Layer sequence compliance",  "val": 1.0,  "cls": "pass" },
+          { "name": "Tier classification accuracy","val": 0.87, "cls": "warn" }
+        ],
+        "verdict": "Faithfulness and sequence compliance above threshold. Tier classification flagged — the PM flag for automated fleet data refresh was placed at T3 (surface only). Given this is the second occurrence of the same root cause, T2 (recommend + approve with a scheduled fix) would be more appropriate.",
+        "improvement": "Fleet age distribution data has no automated refresh schedule — this is the second time this has caused model degradation. Adding a quarterly refresh trigger tied to the fleet data provider's update cadence would prevent recurrence. The knowledge base now has two strong precedents for this failure type.",
+        "extraMetrics": [
+          { "label": "Evidence utilization rate",      "val": "3 / 3",   "cls": "mv-green", "sub": "All retrieved chunks cited in reasoning",     "note": "INC-MCH-019 confirmed the pattern, retrain record provided the config template, eval log confirmed feature importance ranking. Strong coverage for fleet age drift failures." },
+          { "label": "Field-level grounding failures", "val": "0 / 9",   "cls": "mv-green", "sub": "No undescribed fields in diagnosis path",      "note": "fleet_age_distribution is documented in the catalog with an interpretability note explaining the replacement cycle timing multiplier. Grounding prevented misclassification as a data issue." },
+          { "label": "Retrieval cosine similarity",    "val": "0.84 avg","cls": "mv-green", "sub": "Top chunk similarity to query vector",         "note": "0.90 / 0.84 / 0.77 across 3 chunks. Strong first-chunk match confirms the prior incident is well-indexed. All chunks above 0.75 retrieval confidence threshold." }
+        ]
+      }
+    },
+
+    {
+      "id": "exc-3",
+      "sku": "MCH-RETAIL-CARREFOUR-GROUP",
+      "segment": "Retail consumer tire SKUs",
+      "sev": "HIGH", "sevCls": "p-red",
+      "type": "data_issue",
+      "tier": "T3", "tierCls": "tier-t3",
+      "diagnosis": "Carrefour France stopped sending POS data 6 days ago — consumer tire forecasts for the French market are based on incomplete actuals and should not flow into replenishment",
+      "alert": {
+        "level": "a-red", "icon": "⚠",
+        "title": "Do not use these forecasts — Carrefour France POS data has been missing for 6 days",
+        "desc": "Carrefour France has not sent point-of-sale data since October 21st. The forecasting model ran without 6 days of actual sales, so its output for consumer tire SKUs in the French retail market is unreliable. The agent has suppressed these 11 SKUs from flowing into replenishment and a backfill path has been identified via the Carrefour supplier portal. No action needed from you until the backfill is confirmed."
+      },
+      "rca": {
+        "finding": "<strong>The forecast for these French retail SKUs is wrong because Carrefour France stopped sending POS data 6 days ago.</strong> A data pipeline job collecting Carrefour France point-of-sale data stopped on October 21st and has not recovered. The model ran its normal cycle but was trained on 6 days of missing actuals — its output for all 11 affected consumer tire SKUs in the French market is unreliable. The agent has identified this failure pattern before (incident INC-MCH-031, 9 months ago) — recovery was achieved within one cycle after a manual backfill from the Carrefour supplier portal.",
+        "evidence": [
+          "Carrefour France POS feed last received: 6 days ago (October 21st)",
+          "Pipeline failure confirmed: feed stopped, no automatic recovery triggered",
+          "11 retail consumer tire SKUs in the French market affected — missing 6 days of actual sales",
+          "Prior incident INC-MCH-031 (9 months ago): same pattern, resolved via manual backfill from Carrefour supplier portal, 1-cycle recovery"
+        ],
+        "confidence": 93,
+        "layer": "Data pipeline — Layer 1",
+        "confCls": "mv-green"
+      },
+      "actions": [
+        { "tier": "T1", "tierCls": "at-t1", "tierLabel": "Autonomous",          "title": "11 SKUs suppressed from downstream", "desc": "Affected French retail consumer tire SKUs suppressed from ERP replenishment flow until backfill is confirmed.",                                                        "status": "✓ Done",            "statusCls": "as-done"    },
+        { "tier": "T2", "tierCls": "at-t2", "tierLabel": "Recommend + approve", "title": "Backfill request queued",             "desc": "Manual backfill from Carrefour supplier portal for 11 affected SKUs. Pre-filled, awaiting DS approval.",                                                        "status": "⏳ Pending DS",      "statusCls": "as-pending" },
+        { "tier": "T3", "tierCls": "at-t3", "tierLabel": "Surface only",        "title": "Engineering ticket raised",           "desc": "Carrefour France POS feed — feed stopped with no automatic recovery. Retry logic review + automated stale feed alerting at 48h threshold recommended.",     "status": "🔴 For engineering", "statusCls": "as-review"  }
+      ],
+      "agentSummary": "Carrefour France stopped sending POS data 6 days ago — 11 retail consumer tire SKUs affected, forecasts based on incomplete actuals. Feed failure confirmed. SKUs suppressed from downstream replenishment. Backfill path identified via Carrefour supplier portal. Engineering ticket raised. Confidence 93%.",
+      "agents": [
+        {
+          "name": "Trigger Router",
+          "idxBg": "#e0f2fe", "idxColor": "#0369a1",
+          "result": "2 agents activated", "resultCls": "p-blue",
+          "summary": "Data quality flags on 11 French retail SKUs + wMAPE breach → activates Exception Triage and RCA Diagnostic",
+          "steps": [
+            { "kind": "thought", "text": "Reading forecast summary for MCH-2024-047. Checking activation conditions." },
+            { "kind": "action",  "code": "check_thresholds(cycle='MCH-2024-047', client='MICHELIN')" },
+            { "kind": "obs",     "text": "Data quality flags on 11 SKUs in French retail segment. Consumer tire segment wMAPE delta +3.1 pts (threshold: 2.0). Feed freshness issue detected for Carrefour France." },
+            { "kind": "finding", "text": "Activate Exception Triage (data quality flags + delta) and RCA Diagnostic (wMAPE breach). Feed issue most likely root cause — RCA will confirm." }
+          ]
+        },
+        {
+          "name": "RCA Diagnostic Agent",
+          "idxBg": "#fef3c7", "idxColor": "#b45309",
+          "result": "Root cause: data pipeline", "resultCls": "p-amber",
+          "summary": "Carrefour France feed stopped 6 days ago — 11 French retail SKUs missing actuals. Stopped at Layer 1. Prior incident INC-MCH-031 confirmed same pattern.",
+          "steps": [
+            { "kind": "thought", "text": "Layer 1: checking data pipeline health for retail consumer tire segment, focusing on French market feeds." },
+            { "kind": "action",  "code": "check_feed_freshness('CARREFOUR_FRANCE', 'MICHELIN')" },
+            { "kind": "obs",     "text": "Last successful: 6 days ago. STALE — feed stopped October 21st. No recovery." },
+            { "kind": "thought", "text": "Carrefour France feed stale 6 days. Checking pipeline logs to confirm failure mode." },
+            { "kind": "action",  "code": "check_pipeline_logs('retail_consumer_tires_france', 'last_14_days')" },
+            { "kind": "obs",     "text": "Carrefour France POS data feed stopped October 21st. 11 consumer tire SKUs in French retail missing 6 days of actuals. No error logged — feed silently stopped." },
+            { "kind": "action",  "code": "get_rag_context('Carrefour France POS feed failure retail consumer tires Michelin prior incidents', 'MICHELIN')" },
+            { "kind": "obs",     "text": "Prior incident INC-MCH-031 (9 months ago): same pattern — Carrefour France feed stopped without error. Resolution: manual backfill from Carrefour supplier portal. wMAPE recovered within 1 cycle." },
+            { "kind": "finding", "text": "Root cause confirmed at Layer 1 — data pipeline. Confidence 0.93. Carrefour France feed failure, 11 SKUs affected. Known pattern with documented backfill path. Layers 2–4 not needed." }
+          ]
+        },
+        {
+          "name": "Eval Agent",
+          "idxBg": "#dcfce7", "idxColor": "#15803d",
+          "result": "Score 92/100", "resultCls": "p-green",
+          "summary": "All three eval dimensions above threshold. No human review required. Incident logged.",
+          "steps": [
+            { "kind": "action",  "code": "score_faithfulness(rca_output, evidence_list)" },
+            { "kind": "obs",     "text": "0.93 — all claims supported by Carrefour France feed logs and prior incident INC-MCH-031. Feed failure confirmed independently from pipeline logs and feed freshness check." },
+            { "kind": "action",  "code": "score_layer_sequence(rca_output)" },
+            { "kind": "obs",     "text": "1.0 — Layer 1 checked first, stopped correctly at root cause. Prior incident retrieval used to confirm recovery path. Correct sequence." },
+            { "kind": "action",  "code": "score_tier_classification(tier_actions)" },
+            { "kind": "obs",     "text": "0.91 — SKU suppression correctly T1 (reversible, autonomous). Backfill request correctly T2 (requires DS approval). Engineering ticket correctly T3." },
+            { "kind": "finding", "text": "Overall score 92/100. No action required. Incident logged to knowledge base." }
+          ]
+        }
+      ],
+      "rag": {
+        "query": "Carrefour France POS feed failure retail consumer tires Michelin prior incidents",
+        "intent": "data_issue resolution precedent",
+        "filters": ["client_id: MICHELIN", "source_type: incident_record, pipeline_log, readiness_report"],
+        "stats": { "total": 15000, "filtered": 198, "topK": 20, "reranked": 3 },
+        "latency": "301ms",
+        "chunks": [
+          { "source": "Incident Record",      "id": "INC-MCH-031 / chunk_1","sim": 0.93, "preview": "Carrefour France POS feed stopped without error — silent failure, no retry triggered. 11 consumer tire SKUs in French retail affected. Resolution: manual backfill from Carrefour supplier portal, confirmed within 20 hours. wMAPE recovered within 1 cycle.",                                        "tags": ["MICHELIN", "data_issue", "carrefour"],      "date": "2024-01-19" },
+          { "source": "Pipeline Log",         "id": "PL-MCH-044 / chunk_2", "sim": 0.85, "preview": "Carrefour France POS pipeline: last successful run October 21st. No error recorded — feed stopped silently. Recommendation: add explicit feed receipt acknowledgment check and 48h staleness alert to Carrefour France pipeline.",                                                                       "tags": ["MICHELIN", "pipeline", "carrefour"],        "date": "2024-10-27" },
+          { "source": "Data Readiness Report","id": "RR-MCH-047 / chunk_3", "sim": 0.76, "preview": "Post-backfill validation MCH-cycle-038: Carrefour France actuals restored. Schema validation APPROVED. Temporal integrity APPROVED. French retail consumer tire SKUs returned to normal replenishment flow. Recommended: add explicit feed receipt check to daily readiness report.",                "tags": ["MICHELIN", "readiness", "retail_france"],   "date": "2024-01-24" }
+        ]
+      },
+      "eval": {
+        "overall": 92,
+        "dims": [
+          { "name": "Diagnostic faithfulness",    "val": 0.93, "cls": "pass" },
+          { "name": "Layer sequence compliance",  "val": 1.0,  "cls": "pass" },
+          { "name": "Tier classification accuracy","val": 0.91, "cls": "pass" }
+        ],
+        "verdict": "All dimensions above threshold. Root cause correctly stopped at Layer 1. High confidence diagnosis supported by direct precedent in the knowledge base. Incident logged for future retrieval.",
+        "improvement": "The Carrefour France feed has now failed twice in 9 months — both times silently, without triggering an alert. Adding an explicit feed receipt acknowledgment check and a 48-hour staleness alert would catch this pattern before it accumulates 6+ days of missing actuals. Aligns with the same recommendation made after INC-MCH-031.",
+        "extraMetrics": [
+          { "label": "Evidence utilization rate",      "val": "3 / 3",   "cls": "mv-green", "sub": "All retrieved chunks cited in reasoning",     "note": "INC-MCH-031 confirmed the prior pattern, pipeline log confirmed the silent failure mode, readiness report confirmed the backfill recovery path. High utilization — strong knowledge base coverage for Carrefour France failures." },
+          { "label": "Field-level grounding failures", "val": "0 / 11",  "cls": "mv-green", "sub": "No undescribed fields in diagnosis path",      "note": "All 11 affected SKUs had complete catalog descriptions. Feed freshness and data quality fields both documented with LLM interpretability notes." },
+          { "label": "Retrieval cosine similarity",    "val": "0.85 avg","cls": "mv-green", "sub": "Top chunk similarity to query vector",         "note": "0.93 / 0.85 / 0.76 across 3 chunks. Strong top-chunk match (0.93) confirms INC-MCH-031 is well-indexed in the knowledge base. Third chunk still above 0.75 retrieval confidence threshold." }
+        ]
+      }
+    }
+  ]
+}

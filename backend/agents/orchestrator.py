@@ -225,10 +225,109 @@ CORNING_DEMO = {
     ],
 }
 
+# ── Demo scenario: Michelin cycle 47 ─────────────────────────────────────────
+MICHELIN_DEMO = {
+    "forecast_summary": {
+        "cycle_id": "MCH-2024-047",
+        "client_id": "MICHELIN",
+        "total_skus": 1800,
+        "skus_with_delta_above_threshold": 14,
+        "segments_with_accuracy_breach": [
+            {
+                "segment": "commercial_truck_tires",
+                "wMAPE_prior": 10.1,
+                "wMAPE_current": 13.8,
+                "bias": 0.19
+            }
+        ],
+        "data_quality_flags": 1,
+        "trade_calendar_events": ["Q4 fleet replacement cycle"],
+    },
+    "config": {
+        "delta_threshold": 0.15,
+        "bias_threshold": 0.15,
+        "degradation_threshold_wMAPE": 2.0,
+        "sustained_degradation_cycles": 3,
+    },
+    "escalation_flag": False,
+    "prior_accuracy": {"wMAPE": 10.1, "bias": 0.07},
+    "sku_exceptions": [
+        {
+            "sku_id": "MCH-TRUCK-SEASONAL-GROUP",
+            "location_id": "ALL",
+            "forecast_delta_pct": 0.25,
+            "bias_history": [0.08, 0.13, 0.19],
+            "data_quality_score": 0.86,
+            "trade_calendar_event": "Q4 fleet replacement cycle",
+        },
+        {
+            "sku_id": "MCH-FLEET-REPLACE-Q4",
+            "location_id": "ALL",
+            "forecast_delta_pct": 0.22,
+            "bias_history": [0.06, 0.09, 0.14],
+            "data_quality_score": 0.81,
+            "trade_calendar_event": "Q4 fleet replacement cycle",
+        },
+        {
+            "sku_id": "MCH-RETAIL-CARREFOUR-GROUP",
+            "location_id": "FR",
+            "forecast_delta_pct": 0.18,
+            "bias_history": [0.11, 0.16, 0.21],
+            "data_quality_score": 0.44,
+            "trade_calendar_event": None,
+        },
+    ],
+    "pipeline_data": {
+        "feed_freshness": {
+            "MICHELIN_DIST_EUROPE": "6 days ago",
+            "MICHELIN_FLEET_DIRECT": "2 hours ago",
+            "MICHELIN_RETAIL_FR": "fresh",
+        },
+        "pipeline_failures": ["MICHELIN_DIST_EUROPE: connection timeout 6 days ago"],
+        "data_quality_scores": {
+            "commercial_truck_tires": 0.86,
+            "fleet_replacement": 0.81,
+            "retail_fr": 0.44,
+        },
+        "feature_drift": {
+            "fleet_age_distribution": 0.78,
+        },
+        "model_metadata": {
+            "model_id": "michelin_autogluon_v8",
+            "last_trained": "2024-05-15",
+            "training_window": "24 months",
+        },
+        "trade_calendar": {
+            "Q4 fleet replacement cycle": {
+                "week": 44,
+                "prior_year_uplift_range": "0.20-0.28",
+            }
+        },
+    },
+    "degradation_summary": {
+        "wMAPE_prior": 10.1,
+        "wMAPE_current": 13.8,
+        "bias_current": 0.19,
+        "bias_trend": "worsening",
+        "cycles_degraded": 3,
+    },
+    "degradation_history": [
+        {"cycle": 44, "wMAPE": 10.1, "bias": 0.08},
+        {"cycle": 45, "wMAPE": 11.4, "bias": 0.13},
+        {"cycle": 46, "wMAPE": 12.6, "bias": 0.16},
+        {"cycle": 47, "wMAPE": 13.8, "bias": 0.19},
+    ],
+}
+
 DEMO_SCENARIOS = {
     "hersheys_cycle_47": HERSHEYS_DEMO,
-    "corning_cycle_47": CORNING_DEMO,
+    "corning_cycle_47":  CORNING_DEMO,
+    "michelin_cycle_47": MICHELIN_DEMO,
 }
+
+
+def get_scenarios() -> dict:
+    return DEMO_SCENARIOS
 
 
 if __name__ == "__main__":
