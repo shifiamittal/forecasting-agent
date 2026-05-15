@@ -131,6 +131,10 @@ def _build_exceptions(triage, rca, rca_eval, retrain, retrain_eval, scenario):
         else:
             sev_label, sev_cls = "LOW",  "p-gray"
 
+        # Demand signals always require planner review — override T1 to T2
+        if exc_type == "demand_signal" and tier == 1:
+            tier = 2
+
         tier_label = f"T{tier}"
         tier_cls   = f"tier-t{tier}"
         diagnosis  = exc.get("one_line_diagnosis", exc.get("recommended_action", "See full story for details"))
@@ -160,30 +164,38 @@ def _build_exceptions(triage, rca, rca_eval, retrain, retrain_eval, scenario):
 # ── Per-exception sub-builders ────────────────────────────────────────────────
 
 def _build_exception_alert(exc_type, rca, exc):
-    root_cause = rca.get("root_cause_layer", "")
-    summary    = rca.get("root_cause_summary", "")
+    summary = rca.get("root_cause_summary", "")
 
-    if exc_type == "data_issue" or root_cause == "data":
+    if exc_type == "data_issue":
         return {
             "level": "a-red",
             "icon":  "⚠",
             "title": "Data pipeline issue — forecast unreliable",
             "desc":  summary or "A data pipeline failure has been detected. Forecasts for affected SKUs should not be used until resolved.",
         }
-    elif exc_type in ("feature_drift", "model_issue") or root_cause in ("feature", "model"):
+    elif exc_type in ("feature_drift", "model_issue"):
         return {
             "level": "a-amber",
             "icon":  "⚡",
             "title": "Model degradation detected — action required",
             "desc":  summary or "The forecasting model is producing degraded accuracy. Investigation and likely retrain required.",
         }
-    else:
+    elif exc_type == "demand_signal":
         return {
             "level": "a-green",
             "icon":  "✓",
             "title": "Exception explained — demand signal identified",
-            "desc":  summary or "The forecast deviation is explained by an external demand signal. Planner review of override value recommended.",
+            "desc":  exc.get("one_line_diagnosis", "The forecast deviation is explained by an external demand signal. Planner review of override value recommended."),
         }
+    else:
+        # Fall back to RCA layer when exc_type is unrecognised
+        layer = rca.get("root_cause_layer", "")
+        if layer == "data":
+            return {"level": "a-red",   "icon": "⚠",  "title": "Data pipeline issue",        "desc": summary}
+        elif layer in ("feature", "model"):
+            return {"level": "a-amber", "icon": "⚡", "title": "Model degradation detected",  "desc": summary}
+        else:
+            return {"level": "a-green", "icon": "✓",  "title": "Exception explained",         "desc": summary}
 
 
 def _build_exception_rca(rca, exc_type):
